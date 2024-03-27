@@ -409,12 +409,15 @@ class InternLM_LLM(LLM):
     tokenizer : AutoTokenizer = None
     model: AutoModelForCausalLM = None
 
-    def __init__(self, model_path :str):
+    def __init__(self, model_path :str, load_in_8bit: bool = False):
         # model_path: InternLM 模型路径
         # 从本地初始化模型
         super().__init__()
         print("正在从本地加载模型...")
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        quantization_config = BitsAndBytesConfig(
+            load_in_8bit=True,
+        )
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=torch.float16,
@@ -595,28 +598,26 @@ def load_chain():
 接着我们定义一个类，该类负责加载并存储检索问答链，并响应 Web 界面里调用检索问答链进行回答的动作：
 
 ```python
-class Model_center():
+class ModelCenter():
     """
-    存储检索问答链的对象 
+    存储问答 Chain 的对象
     """
     def __init__(self):
-        # 构造函数，加载检索问答链
         self.chain = load_chain()
 
-    def qa_chain_self_answer(self, question: str, chat_history: list = []):
+    def qa_chain_self_answer(self, query: str, history: list = []):
         """
-        调用问答链进行回答
+        调用不带历史记录的问答链进行回答
         """
-        if question == None or len(question) < 1:
-            return "", chat_history
+        if query == None or len(query) < 1:
+            return "", history
         try:
-            chat_history.append(
-                (question, self.chain.invoke({"query": question})["result"]))
-            # 将问答结果直接附加到问答历史中，Gradio 会将其展示出来
-            return "", chat_history
+            response = self.chain.invoke({"query": query})["result"]
+            history.append(
+                (query, response))
+            return "", history
         except Exception as e:
-            return e, chat_history
-
+            return e, history
 ```
 
 然后我们只需按照 Gradio 的框架使用方法，实例化一个 Web 界面并将点击动作绑定到上述类的回答方法即可：
@@ -645,7 +646,7 @@ def load_chain():
         embedding_function=embeddings
     )
 
-    llm = InternLM_LLM(model_path = "./internlm2-chat-1_8b")
+    llm = InternLM_LLM(model_path = "../models/internlm2-chat-1_8b")
 
     # 你可以修改这里的 prompt template 来试试不同的问答效果
     template = """请使用以下提供的上下文来回答用户的问题。如果无法从上下文中得到答案，请回答你不知道，并总是使用中文回答。
@@ -673,28 +674,29 @@ def load_chain():
 
     return qa_chain
 
-class Model_center():
+class ModelCenter():
     """
     存储问答 Chain 的对象
     """
     def __init__(self):
         self.chain = load_chain()
 
-    def qa_chain_self_answer(self, question: str, chat_history: list = []):
+    def qa_chain_self_answer(self, query: str, history: list = []):
         """
         调用不带历史记录的问答链进行回答
         """
-        if question == None or len(question) < 1:
-            return "", chat_history
+        if query == None or len(query) < 1:
+            return "", history
         try:
-            chat_history.append(
-                (question, self.chain.invoke({"query": question})["result"]))
-            return "", chat_history
+            response = self.chain.invoke({"query": query})["result"]
+            history.append(
+                (query, response))
+            return "", history
         except Exception as e:
-            return e, chat_history
+            return e, history
 
 
-model_center = Model_center()
+model_center = ModelCenter()
 
 block = gr.Blocks()
 with block as demo:
@@ -714,6 +716,7 @@ with block as demo:
             with gr.Row():
                 # 创建提交按钮。
                 db_wo_his_btn = gr.Button("Chat")
+
             with gr.Row():
                 # 创建一个清除按钮，用于清除聊天机器人组件的内容。
                 clear = gr.ClearButton(
@@ -734,6 +737,7 @@ gr.close_all()
 # demo.launch(share=True, server_port=int(os.environ['PORT1']))
 # 直接启动
 demo.launch()
+
 ```
 
 通过将上述代码封装为 run_gradio.py 脚本，直接通过 python 命令运行，即可在本地启动知识库助手的 Web Demo，默认会在 7860 端口运行，接下来将服务器端口映射到本地端口即可访问:

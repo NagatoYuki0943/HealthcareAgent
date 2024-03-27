@@ -21,15 +21,15 @@ class InternLM_LLM(LLM):
     tokenizer : AutoTokenizer = None
     model: AutoModelForCausalLM = None
 
-    def __init__(self, model_path :str, load_in_8bit: bool = True):
+    def __init__(self, model_path :str, load_in_8bit: bool = False):
         # model_path: InternLM 模型路径
         # 从本地初始化模型
         super().__init__()
         print("正在从本地加载模型...")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         quantization_config = BitsAndBytesConfig(
             load_in_8bit=True,
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=torch.float16,

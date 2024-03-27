@@ -1,10 +1,10 @@
 # 首先导入所需第三方库
-# from langchain.document_loaders import UnstructuredFileLoader
-from langchain_community.document_loaders import UnstructuredFileLoader
-# from langchain.document_loaders import UnstructuredMarkdownLoader
-from langchain_community.document_loaders import UnstructuredMarkdownLoader
+from langchain_community.document_loaders import (
+    UnstructuredFileLoader,
+    UnstructuredMarkdownLoader,
+    PyPDFLoader,
+)
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-# from langchain.vectorstores import Chroma
 from langchain_community.vectorstores import Chroma
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
@@ -46,18 +46,14 @@ def get_text(dir_path):
     return docs
 
 # 目标文件夹
-tar_dir = [
-    "./data/InternLM",
-    "./data/InternLM-XComposer",
-    "./data/lagent",
-    "./data/lmdeploy",
-    "./data/opencompass",
-    "./data/xtuner"
-]
+tar_dirs = "./data"
+dirs = os.listdir(tar_dirs)
+dirs = [os.path.join(tar_dirs, dir) for dir in dirs]
+dirs = [dir for dir in dirs if os.path.isdir(dir)]
 
 # 加载目标文件
 docs = []
-for dir_path in tar_dir:
+for dir_path in dirs:
     docs.extend(get_text(dir_path))
 
 # 对文本进行分块
