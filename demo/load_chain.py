@@ -46,7 +46,7 @@ def load_chain(
         llm,
         retriever=vectordb.as_retriever(),
         return_source_documents=True,
-        chain_type_kwargs={"prompt":QA_CHAIN_PROMPT}
+        chain_type_kwargs={"prompt": QA_CHAIN_PROMPT}
     )
 
     return qa_chain
