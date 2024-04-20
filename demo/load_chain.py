@@ -1,14 +1,21 @@
 # 导入必要的库
 from langchain_community.vectorstores import Chroma
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-import os
 from LLM import InternLM_LLM
 from langchain.prompts import PromptTemplate
 
+
 def load_chain(
-    llm_path: str = "../models/internlm2-chat-1_8b",
+    llm_path: str = "./models/internlm2-chat-1_8b",
     embedding_model_name: str = "./sentence-transformer",
-    persist_directory: str = "./vector_db/chroma"
+    persist_directory: str = "./vector_db/chroma",
+    adapter_dir: str = None,
+    load_in_8bit: bool = False,
+    load_in_4bit: bool = False,
+    system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
+    - InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室). It is designed to be helpful, honest, and harmless.
+    - InternLM (书生·浦语) can understand and communicate fluently in the language chosen by the user such as English and 中文.
+    """
 ):
     # 加载问答链
     # 定义 Embeddings
@@ -23,7 +30,13 @@ def load_chain(
         embedding_function=embeddings
     )
 
-    llm = InternLM_LLM(model_path = llm_path)
+    llm = InternLM_LLM(
+        pretrained_model_name_or_path=llm_path,
+        adapter_dir=adapter_dir,
+        load_in_8bit=load_in_8bit,
+        load_in_4bit=load_in_4bit,
+        system_prompt=system_prompt
+    )
 
     # 你可以修改这里的 prompt template 来试试不同的问答效果
     template = """请使用以下提供的上下文来回答用户的问题。如果无法从上下文中得到答案，请回答你不知道，并总是使用中文回答。

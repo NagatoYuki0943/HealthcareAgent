@@ -10,6 +10,8 @@ from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 import os
 
+
+# 获取文件路径函数
 # 获取文件路径函数
 def get_files(dir_path):
     # args：dir_path，目标文件夹路径
@@ -23,7 +25,10 @@ def get_files(dir_path):
                 file_list.append(os.path.join(filepath, filename))
             elif filename.endswith(".txt"):
                 file_list.append(os.path.join(filepath, filename))
+            elif filename.endswith(".pdf"):
+                file_list.append(os.path.join(filepath, filename))
     return file_list
+
 
 # 加载文件函数
 def get_text(dir_path):
@@ -39,11 +44,15 @@ def get_text(dir_path):
             loader = UnstructuredMarkdownLoader(one_file)
         elif file_type == 'txt':
             loader = UnstructuredFileLoader(one_file)
+        elif file_type == 'pdf':
+            loader = PyPDFLoader(one_file)
         else:
+            print("不符合条件的文件：", one_file)
             # 如果是不符合条件的文件，直接跳过
             continue
         docs.extend(loader.load())
     return docs
+
 
 # 目标文件夹
 tar_dirs = "./data"
