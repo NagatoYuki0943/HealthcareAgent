@@ -8,3 +8,5 @@ accelerate
 tiktoken
 langchain
 chroma
+pypdf
+openxlab

@@ -1,7 +1,7 @@
 from load_model import load_model, load_vectordb
 import gradio as gr
 from typing import Generator, Any
-import os
+from utils import get_filename, format_references
 
 
 print("gradio version: ", gr.__version__)
@@ -34,26 +34,6 @@ TEMPLATE = """请使用以下提供的上下文来回答用户的问题。如果
 ···
 用户的问题: {question}
 你给的回答:"""
-
-
-def get_filename(path: str):
-    """
-    './data\\FM docs 2024.3\\JOM_1998_13_4_06_The_Application_of_the_Hardin_Jones-Pauling-.pdf'
-    ->
-    ('./data\\FM docs 2024.3',
-    'JOM_1998_13_4_06_The_Application_of_the_Hardin_Jones-Pauling-.pdf')
-    """
-    basepath, filename = os.path.split(path)
-    return filename
-
-
-def format_references(references: list[str]) -> str:
-    if len(references) == 0:
-        return "\nno references."
-    else:
-        references = [f"*{reference}*" for reference in references]
-        references_str = ", ".join(references)
-        return f"\nreferences: \n{references_str}"
 
 
 def chat(
