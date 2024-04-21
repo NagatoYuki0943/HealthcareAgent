@@ -4,6 +4,5 @@ __pycache__/
 
 models/
 work_dirs/
-demo/sentence-transformer/
-demo/data/
-demo/vector_db/
+data/
+vector_db/

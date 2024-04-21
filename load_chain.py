@@ -1,13 +1,13 @@
-# 导入必要的库
 from langchain_community.vectorstores import Chroma
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from LLM import InternLM_LLM
 from langchain.prompts import PromptTemplate
+from langchain.chains import RetrievalQA
 
 
 def load_chain(
     llm_path: str = "./models/internlm2-chat-1_8b",
-    embedding_model_name: str = "./sentence-transformer",
+    embedding_model_name: str = "./models/sentence-transformer",
     persist_directory: str = "./vector_db/chroma",
     adapter_dir: str = None,
     load_in_8bit: bool = False,
@@ -26,8 +26,8 @@ def load_chain(
 
     # 加载数据库
     vectordb = Chroma(
+        embedding_function=embeddings,
         persist_directory=persist_directory,  # 允许我们将persist_directory目录保存到磁盘上
-        embedding_function=embeddings
     )
 
     llm = InternLM_LLM(
@@ -52,14 +52,14 @@ def load_chain(
         template=template
     )
 
-    # 运行 chain
-    from langchain.chains import RetrievalQA
-
     qa_chain = RetrievalQA.from_chain_type(
         llm,
-        retriever=vectordb.as_retriever(),
+        retriever=vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 5}),
         return_source_documents=True,
-        chain_type_kwargs={"prompt": QA_CHAIN_PROMPT}
+        chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
     )
 
     return qa_chain
+
+if __name__ == "__main__":
+    load_chain()

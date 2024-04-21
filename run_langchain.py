@@ -44,7 +44,7 @@ class ModelCenter():
         """
         调用不带历史记录的问答链进行回答
         """
-        query = query.replace(' ', '')
+        query = query.strip()
         if query == None or len(query) < 1:
             ...
             # yield history

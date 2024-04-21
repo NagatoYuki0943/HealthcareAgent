@@ -1,0 +1,10 @@
+gradio>4
+transformers
+peft
+bitsandbytes
+sentencepiece
+einops
+accelerate
+tiktoken
+langchain
+chroma
