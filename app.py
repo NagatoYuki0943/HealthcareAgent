@@ -50,7 +50,7 @@ LMDEPLOY_CONFIG = LmdeployConfig(
     backend='turbomind',
     model_format='hf',
     model_name='internlm2',
-    custom_model_name='internlm2_chat_1_8b',
+    custom_model_name='internlm2_chat_doctor',
     system_prompt=SYSTEM_PROMPT
 )
 
