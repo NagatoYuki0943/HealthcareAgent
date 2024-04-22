@@ -57,7 +57,7 @@ def get_text(dir_path):
 def create_db(
     tar_dirs: str = "./data",
     embedding_dir: str = "./models/sentence-transformer",
-    persist_directory = "./vector_db/chroma"
+    persist_directory: str = "./vector_db/chroma"
 ):
     dirs = os.listdir(tar_dirs)
     dirs = [os.path.join(tar_dirs, dir) for dir in dirs]

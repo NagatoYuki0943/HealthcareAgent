@@ -56,8 +56,8 @@ def load_model(
 
 
 def load_vectordb(
-    persist_directory: str,
     embedding_dir: str,
+    persist_directory: str,
 ) -> Chroma:
     # 加载开源词向量模型
     embeddings = HuggingFaceEmbeddings(model_name=embedding_dir)

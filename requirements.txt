@@ -10,3 +10,4 @@ langchain
 chroma
 pypdf
 openxlab
+lmdeploy

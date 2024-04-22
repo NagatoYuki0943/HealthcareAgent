@@ -1,28 +1,16 @@
 import os
-from create_db import create_db
 from load_model import load_vectordb
-from infer_engine import InferEngine, LmdeployConfig
+from infer_engine import InferEngine, TransformersConfig
 import gradio as gr
 from typing import Generator, Any
-from utils import get_filename, format_references, download_dataset
+from utils import get_filename, format_references
 
 
 print("gradio version: ", gr.__version__)
 
 
-DATA_PATH = "./data"
 EMBEDDING_DIR = "./models/sentence-transformer"
 PERSIST_DIRECTORY = "./vector_db/chroma"
-
-# 下载数据集
-download_dataset(target_path=DATA_PATH)
-
-# 创建向量数据库
-create_db(
-    tar_dirs = DATA_PATH,
-    embedding_dir = EMBEDDING_DIR,
-    persist_directory = PERSIST_DIRECTORY
-)
 
 # 载入向量数据库
 vectordb = load_vectordb(
@@ -31,9 +19,13 @@ vectordb = load_vectordb(
 )
 
 # clone 模型
-MODEL_PATH = './models/internlm2-chat-7b'
-os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b {MODEL_PATH}')
-os.system(f'cd {MODEL_PATH} && git lfs pull')
+PRETRAINED_MODEL_NAME_OR_PATH = './models/internlm2-chat-1_8b'
+# os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-1.8b {PRETRAINED_MODEL_NAME_OR_PATH}')
+# os.system(f'cd {PRETRAINED_MODEL_NAME_OR_PATH} && git lfs pull')
+ADAPTER_DIR = None
+# 量化
+LOAD_IN_8BIT= False
+LOAD_IN_4BIT = False
 
 SYSTEM_PROMPT = "你现在是一名医生，具备丰富的医学知识和临床经验。你擅长诊断和治疗各种疾病，能为病人提供专业的医疗建议。你有良好的沟通技巧，能与病人和他们的家人建立信任关系。请在这个角色下为我解答以下问题。"
 
@@ -45,19 +37,18 @@ TEMPLATE = """请使用以下提供的上下文来回答用户的问题。如果
 用户的问题: {question}
 你给的回答:"""
 
-LMDEPLOY_CONFIG = LmdeployConfig(
-    model_path=MODEL_PATH,
-    backend='turbomind',
-    model_format='hf',
-    model_name='internlm2',
-    custom_model_name='internlm2_chat_1_8b',
+TRANSFORMERS_CONFIG = TransformersConfig(
+    pretrained_model_name_or_path=PRETRAINED_MODEL_NAME_OR_PATH,
+    adapter_dir=ADAPTER_DIR,
+    load_in_8bit=LOAD_IN_8BIT,
+    load_in_4bit=LOAD_IN_4BIT,
     system_prompt=SYSTEM_PROMPT
 )
 
 # 载入模型
 infer_engine = InferEngine(
-    backend='lmdeploy', # transformers, lmdeploy
-    lmdeploy_config=LMDEPLOY_CONFIG
+    backend='transformers', # transformers, lmdeploy
+    transformers_config=TRANSFORMERS_CONFIG,
 )
 
 

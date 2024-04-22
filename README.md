@@ -24,7 +24,9 @@
 
 `run_langchain_gradio.py`是使用 langchain 运行模型，功能不全
 
-`app.py` 会议中展示的，功能最全
+`run_custom_gradio.py` 会议中展示的，功能最全
+
+`app.py` 内容和 `run_custom_gradio.py` 相同，不同点是会下载数据集，创建数据库，下载模型并运行，并使用了 lmdeploy 加速
 
 ## 注意
 
@@ -33,6 +35,9 @@
 ## TODO
 
 - [x] 返回参考文档
-- [ ]  当查询库中没有对应数据时说明找不到内容
-- [ ] 当前使用 tranformers 库进行推理，速度较慢，可以换成 lmdeploy 库进行加速，可以参考我的实现 https://github.com/NagatoYuki0943/xlab-huanhuan/blob/master/lmdeploy/turbomind_gradio_stream.py
+- [x] 当前使用 tranformers 库进行推理，速度较慢，可以换成 lmdeploy 库进行加速
+- [ ] 当查询库中没有对应数据时说明找不到内容
+- [ ] 加上重排序模型
+
+
 
