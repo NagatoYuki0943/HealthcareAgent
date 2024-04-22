@@ -36,7 +36,7 @@ def download_dataset(
     print(f"access_key = {access_key}")
     print(f"secret_key = {secret_key}")
     openxlab.login(ak=access_key, sk=secret_key)
-    # get(dataset_repo=dataset_repo, target_path=target_path) # 数据集下载
+    get(dataset_repo=dataset_repo, target_path=target_path) # 数据集下载
     print("finish download dataset")
 
 
