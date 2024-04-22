@@ -340,8 +340,10 @@ class InferEngine:
         """对话
 
         Args:
+            query (str): 问题
             history (list, optional): 对话历史. Defaults to [].
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+            max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
             top_p (float, optional): top_p. Defaults to 0.8.
             top_k (int, optional): top_k. Defaults to 40.
             temperature (float, optional): temperature. Defaults to 0.8.
@@ -433,20 +435,20 @@ class InferEngine:
         temperature: float = 0.8,
         **kwargs,
     ) -> Generator[Any, Any, Any]:
-        """流式返回回答
+        """流式返回对话
 
         Args:
             query (str): 问题
             history (list, optional): 对话历史. Defaults to [].
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+            max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
             top_p (float, optional): top_p. Defaults to 0.8.
             top_k (int, optional): top_k. Defaults to 40.
             temperature (float, optional): temperature. Defaults to 0.8.
 
-        Returns:
+        Yields:
             Generator[Any, Any, Any]: 回答和历史记录
         """
-
         if self.backend == 'transformers':
             return self.transformers_chat_stream(query, history, max_new_tokens, top_p, top_k, temperature, **kwargs)
         elif self.backend == 'lmdeploy':
