@@ -17,15 +17,19 @@ DATA_PATH = "./data"
 EMBEDDING_DIR = "./models/sentence-transformer"
 PERSIST_DIRECTORY = "./vector_db/chroma"
 
-# 下载数据集
-download_dataset(target_path=DATA_PATH)
 
-# 创建向量数据库
-create_db(
-    tar_dirs = DATA_PATH,
-    embedding_dir = EMBEDDING_DIR,
-    persist_directory = PERSIST_DIRECTORY
-)
+if not os.path.exists(DATA_PATH):
+    # 下载数据集
+    download_dataset(target_path = DATA_PATH)
+
+# 不存在才创建,原因是应用自启动可能会重新写入数据库
+if not os.path.exists(PERSIST_DIRECTORY):
+    # 创建向量数据库
+    create_db(
+        tar_dirs = DATA_PATH,
+        embedding_dir = EMBEDDING_DIR,
+        persist_directory = PERSIST_DIRECTORY
+    )
 
 # 载入向量数据库
 vectordb = load_vectordb(
@@ -49,18 +53,18 @@ TEMPLATE = """请使用以下提供的上下文来回答用户的问题。如果
 你给的回答:"""
 
 LMDEPLOY_CONFIG = LmdeployConfig(
-    model_path=MODEL_PATH,
-    backend='turbomind',
-    model_format='hf',
-    model_name='internlm2',
-    custom_model_name='internlm2_chat_doctor',
-    system_prompt=SYSTEM_PROMPT
+    model_path = MODEL_PATH,
+    backend = 'turbomind',
+    model_format = 'hf',
+    model_name = 'internlm2',
+    custom_model_name = 'internlm2_chat_doctor',
+    system_prompt = SYSTEM_PROMPT
 )
 
 # 载入模型
 infer_engine = InferEngine(
-    backend='lmdeploy', # transformers, lmdeploy
-    lmdeploy_config=LMDEPLOY_CONFIG
+    backend = 'lmdeploy', # transformers, lmdeploy
+    lmdeploy_config = LMDEPLOY_CONFIG
 )
 
 

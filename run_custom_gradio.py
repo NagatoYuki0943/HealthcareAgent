@@ -38,17 +38,17 @@ TEMPLATE = """请使用以下提供的上下文来回答用户的问题。如果
 你给的回答:"""
 
 TRANSFORMERS_CONFIG = TransformersConfig(
-    pretrained_model_name_or_path=PRETRAINED_MODEL_NAME_OR_PATH,
-    adapter_dir=ADAPTER_DIR,
-    load_in_8bit=LOAD_IN_8BIT,
-    load_in_4bit=LOAD_IN_4BIT,
-    system_prompt=SYSTEM_PROMPT
+    pretrained_model_name_or_path = PRETRAINED_MODEL_NAME_OR_PATH,
+    adapter_dir = ADAPTER_DIR,
+    load_in_8bit = LOAD_IN_8BIT,
+    load_in_4bit = LOAD_IN_4BIT,
+    system_prompt = SYSTEM_PROMPT
 )
 
 # 载入模型
 infer_engine = InferEngine(
-    backend='transformers', # transformers, lmdeploy
-    transformers_config=TRANSFORMERS_CONFIG,
+    backend = 'transformers', # transformers, lmdeploy
+    transformers_config = TRANSFORMERS_CONFIG,
 )
 
 
