@@ -23,7 +23,7 @@ def format_references(references: list[str]) -> str:
 
 def download_dataset(
     dataset_repo='NagatoYuki0943/FMdocs',
-    target_path='./data1/'
+    target_path='./data/'
 ):
     import os
     import openxlab
