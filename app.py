@@ -6,6 +6,9 @@ import gradio as gr
 from typing import Generator, Any
 from utils import get_filename, format_references, download_dataset
 
+print("*" * 100)
+os.system("pip list")
+print("*" * 100)
 
 print("gradio version: ", gr.__version__)
 
@@ -136,7 +139,7 @@ def main():
         with gr.Row(equal_height=True):
             with gr.Column(scale=15):
                 gr.Markdown("""<h1><center>InternLM</center></h1>
-                    <center>InternLM2</center>
+                    <center>Medical-RAG</center>
                     """)
             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
 

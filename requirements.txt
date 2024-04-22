@@ -9,5 +9,5 @@ tiktoken
 langchain
 chroma
 pypdf
-openxlab
 lmdeploy
+openxlab>=0.0.38
