@@ -31,8 +31,8 @@ def download_dataset(
 
     print("start download dataset")
     print(os.environ.keys())
-    access_key = os.environ.get("ACCESSKEY", "")
-    secret_key = os.environ.get("SECRETKEY", "")
+    access_key = os.getenv("OPENXLAB_AK", "")
+    secret_key = os.getenv("OPENXLAB_SK", "")
     print(f"access_key = {access_key}")
     print(f"secret_key = {secret_key}")
     openxlab.login(ak=access_key, sk=secret_key)
