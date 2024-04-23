@@ -167,7 +167,7 @@ def main():
 
                 with gr.Row():
                     # 创建一个文本框组件，用于输入 prompt。
-                    query = gr.Textbox(label="Prompt/问题")
+                    query = gr.Textbox(label="Prompt/问题", placeholder="请输入你的问题，按 Enter 或者右边的按钮提交，按 Shift + Enter 可以换行")
                     # 创建提交按钮。
                     # variant https://www.gradio.app/docs/button
                     # scale https://www.gradio.app/guides/controlling-layout
