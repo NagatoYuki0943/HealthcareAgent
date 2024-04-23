@@ -1,12 +1,12 @@
 # fix chroma sqlite3 error
 # refer: https://github.com/chroma-core/chroma/issues/1985#issuecomment-2055963683
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import os
 from infer_engine import InferEngine, LmdeployConfig
-from create_db import create_chroma_vectordb, load_chroma_vectordb, similarity_search
+from create_db import create_faiss_vectordb, load_faiss_vectordb, similarity_search
 import gradio as gr
 from typing import Generator, Any
 from utils import download_dataset
@@ -22,7 +22,7 @@ print("gradio version: ", gr.__version__)
 
 DATA_PATH = "./data"
 EMBEDDING_MODEL_PATH = "./models/paraphrase-multilingual-MiniLM-L12-v2"
-PERSIST_DIRECTORY = "./vector_db/chroma"
+PERSIST_DIRECTORY = "./vector_db/faiss"
 
 # 下载embedding模型,不会重复下载
 snapshot_download(
@@ -38,14 +38,14 @@ download_dataset(target_path = DATA_PATH)
 # 不存在才创建,原因是应用自启动可能会重新写入数据库
 if not os.path.exists(PERSIST_DIRECTORY):
     # 创建向量数据库
-    create_chroma_vectordb(
+    create_faiss_vectordb(
         tar_dirs = DATA_PATH,
         embedding_model_path = EMBEDDING_MODEL_PATH,
         persist_directory = PERSIST_DIRECTORY
     )
 
 # 载入向量数据库
-vectordb = load_chroma_vectordb(
+vectordb = load_faiss_vectordb(
     embedding_model_path = EMBEDDING_MODEL_PATH,
     persist_directory = PERSIST_DIRECTORY
 )

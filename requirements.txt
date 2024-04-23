@@ -9,11 +9,11 @@ einops==0.7.0
 accelerate==0.29.3
 tiktoken==0.6.0
 langchain==0.1.16
-chromadb==0.4.24
+# chromadb==0.4.24
+# pysqlite3-binary==0.5.2.post3
 faiss-cpu==1.8.0
 pypdf==4.2.0
 # unstructured==0.13.3 # txt,md,doc,docx
 # python-docx==1.1.0 # doc,docx
 lmdeploy==0.3.0
 openxlab==0.0.38
-pysqlite3-binary==0.5.2.post3
