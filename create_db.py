@@ -103,7 +103,7 @@ def load_vectordb(
 
 
 def similarity_search(
-    vectordb,
+    vectordb: Chroma,
     query: str,
     similarity_top_k: int = 4,
 ) -> tuple[str, list, str]:
