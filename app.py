@@ -53,7 +53,7 @@ vectordb = load_vectordb(
 
 # clone 模型
 MODEL_PATH = './models/internlm2-chat-7b'
-os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b-4bits.git {MODEL_PATH}')
+os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b {MODEL_PATH}')
 os.system(f'cd {MODEL_PATH} && git lfs pull')
 
 SYSTEM_PROMPT = "你现在是一名医生，具备丰富的医学知识和临床经验。你擅长诊断和治疗各种疾病，能为病人提供专业的医疗建议。你有良好的沟通技巧，能与病人和他们的家人建立信任关系。请在这个角色下为我解答以下问题。"
@@ -69,7 +69,7 @@ TEMPLATE = """请使用以下提供的上下文来回答用户的问题。如果
 LMDEPLOY_CONFIG = LmdeployConfig(
     model_path = MODEL_PATH,
     backend = 'turbomind',
-    model_format = 'awq',
+    model_format = 'hf',
     model_name = 'internlm2',
     custom_model_name = 'internlm2_chat_doctor',
     system_prompt = SYSTEM_PROMPT
