@@ -1,6 +1,6 @@
 import os
 from infer_engine import InferEngine, TransformersConfig
-from create_db import load_vectordb, similarity_search
+from create_db import load_chroma_vectordb, similarity_search
 import gradio as gr
 from typing import Generator, Any
 
@@ -8,12 +8,12 @@ from typing import Generator, Any
 print("gradio version: ", gr.__version__)
 
 
-EMBEDDING_DIR = "./models/sentence-transformer"
+EMBEDDING_MODEL_PATH = "./models/paraphrase-multilingual-MiniLM-L12-v2"
 PERSIST_DIRECTORY = "./vector_db/chroma"
 
 # 载入向量数据库
-vectordb = load_vectordb(
-    embedding_dir = EMBEDDING_DIR,
+vectordb = load_chroma_vectordb(
+    embedding_model_path = EMBEDDING_MODEL_PATH,
     persist_directory = PERSIST_DIRECTORY
 )
 

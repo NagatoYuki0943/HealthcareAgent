@@ -6,7 +6,7 @@ from langchain_community.document_loaders import (
     PyPDFLoader,
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
+from langchain_core.vectorstores import VectorStore
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 import os
@@ -54,11 +54,13 @@ def get_text(dir_path: str) -> list:
     return docs
 
 
-def create_vectordb(
+def create_chroma_vectordb(
     tar_dirs: str = "./data",
-    embedding_dir: str = "./models/sentence-transformer",
+    embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
     persist_directory: str = "./vector_db/chroma"
 ):
+    from langchain_community.vectorstores import Chroma
+
     dirs = os.listdir(tar_dirs)
     dirs = [os.path.join(tar_dirs, dir) for dir in dirs]
     dirs = [dir for dir in dirs if os.path.isdir(dir)]
@@ -70,40 +72,127 @@ def create_vectordb(
 
     # 对文本进行分块
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500, chunk_overlap=150)
+        chunk_size = 500,
+        chunk_overlap = 150
+    )
     split_docs = text_splitter.split_documents(docs)
 
     # 加载开源词向量模型
-    embeddings = HuggingFaceEmbeddings(model_name=embedding_dir)
+    embeddings = HuggingFaceEmbeddings(
+        model_name = embedding_model_path,
+        model_kwargs = {'device': 'cuda'},
+        encode_kwargs = {
+            'normalize_embeddings': True
+        }
+    )
 
     # 构建向量数据库
-
-    # 加载数据库
     vectordb = Chroma.from_documents(
-        documents=split_docs,
-        embedding=embeddings,
-        persist_directory=persist_directory  # 允许我们将persist_directory目录保存到磁盘上
+        documents = split_docs,
+        embedding = embeddings,
+        persist_directory = persist_directory  # 允许我们将persist_directory目录保存到磁盘上
     )
+
     # 将加载的向量数据库持久化到磁盘上
     vectordb.persist()
 
 
-def load_vectordb(
-    embedding_dir: str,
-    persist_directory: str,
-) -> Chroma:
+def load_chroma_vectordb(
+    embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
+    persist_directory: str = "./vector_db/chroma"
+) -> VectorStore:
+    from langchain_community.vectorstores import Chroma
+
     # 加载开源词向量模型
-    embeddings = HuggingFaceEmbeddings(model_name=embedding_dir)
+    embeddings = HuggingFaceEmbeddings(
+        model_name = embedding_model_path,
+        model_kwargs = {'device': 'cuda'},
+        encode_kwargs = {
+            'normalize_embeddings': True
+        }
+    )
+
     # 加载数据库
     vectordb = Chroma(
-        embedding_function=embeddings,
-        persist_directory=persist_directory,
+        embedding_function = embeddings,
+        persist_directory = persist_directory,
     )
+
+    return vectordb
+
+
+def create_faiss_vectordb(
+    tar_dirs: str = "./data",
+    embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
+    persist_directory: str = "./vector_db/faiss"
+):
+    from langchain_community.vectorstores import FAISS
+
+    dirs = os.listdir(tar_dirs)
+    dirs = [os.path.join(tar_dirs, dir) for dir in dirs]
+    dirs = [dir for dir in dirs if os.path.isdir(dir)]
+
+    # 加载目标文件
+    docs = []
+    for dir_path in dirs:
+        docs.extend(get_text(dir_path))
+
+    # 对文本进行分块
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size = 500,
+        chunk_overlap = 150
+    )
+    split_docs = text_splitter.split_documents(docs)
+
+    # 加载开源词向量模型
+    embeddings = HuggingFaceEmbeddings(
+        model_name = embedding_model_path,
+        model_kwargs = {'device': 'cuda'},
+        encode_kwargs = {
+            'normalize_embeddings': True
+        }
+    )
+
+    # 构建向量数据库
+    vectordb = FAISS.from_documents(
+        documents = split_docs,
+        embedding = embeddings,
+    )
+
+    # 将加载的向量数据库持久化到磁盘上
+    vectordb.save_local(folder_path = persist_directory)
+
+
+def load_faiss_vectordb(
+    embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
+    persist_directory: str = "./vector_db/faiss"
+) -> VectorStore:
+    from langchain_community.vectorstores import FAISS
+    from langchain_community.vectorstores.utils import DistanceStrategy
+
+    # 加载开源词向量模型
+    embeddings = HuggingFaceEmbeddings(
+        model_name = embedding_model_path,
+        model_kwargs = {'device': 'cuda'},
+        encode_kwargs = {
+            'normalize_embeddings': True
+        }
+    )
+
+    # 加载数据库
+    vectordb = FAISS.load_local(
+        folder_path = persist_directory,
+        embeddings = embeddings,
+        allow_dangerous_deserialization = True, # 允许读取pickle
+        distance_strategy = DistanceStrategy.EUCLIDEAN_DISTANCE,
+        normalize_L2 = False,
+    )
+
     return vectordb
 
 
 def similarity_search(
-    vectordb: Chroma,
+    vectordb: VectorStore,
     query: str,
     similarity_top_k: int = 4,
 ) -> tuple[str, list, str]:
@@ -115,3 +204,11 @@ def similarity_search(
     references = list(set([get_filename(doc.metadata['source']) for doc in documents]))
     references_str = format_references(references)
     return documents_str, references_str
+
+
+if __name__ == "__main__":
+    # create_chroma_vectordb()
+    load_chroma_vectordb()
+
+    # create_faiss_vectordb()
+    load_faiss_vectordb()

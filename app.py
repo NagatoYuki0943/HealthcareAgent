@@ -6,7 +6,7 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import os
 from infer_engine import InferEngine, LmdeployConfig
-from create_db import create_vectordb, load_vectordb, similarity_search
+from create_db import create_chroma_vectordb, load_chroma_vectordb, similarity_search
 import gradio as gr
 from typing import Generator, Any
 from utils import download_dataset
@@ -21,16 +21,15 @@ print("gradio version: ", gr.__version__)
 
 
 DATA_PATH = "./data"
-EMBEDDING_DIR = "./models/sentence-transformer"
+EMBEDDING_MODEL_PATH = "./models/paraphrase-multilingual-MiniLM-L12-v2"
 PERSIST_DIRECTORY = "./vector_db/chroma"
 
 # 下载embedding模型,不会重复下载
 snapshot_download(
     repo_id = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-    local_dir = EMBEDDING_DIR,
+    local_dir = EMBEDDING_MODEL_PATH,
     resume_download = True,
     max_workers = 8,
-    endpoint = "https://hf-mirror.com",
 )
 
 # 下载数据集,不会重复下载
@@ -39,15 +38,15 @@ download_dataset(target_path = DATA_PATH)
 # 不存在才创建,原因是应用自启动可能会重新写入数据库
 if not os.path.exists(PERSIST_DIRECTORY):
     # 创建向量数据库
-    create_vectordb(
+    create_chroma_vectordb(
         tar_dirs = DATA_PATH,
-        embedding_dir = EMBEDDING_DIR,
+        embedding_model_path = EMBEDDING_MODEL_PATH,
         persist_directory = PERSIST_DIRECTORY
     )
 
 # 载入向量数据库
-vectordb = load_vectordb(
-    embedding_dir = EMBEDDING_DIR,
+vectordb = load_chroma_vectordb(
+    embedding_model_path = EMBEDDING_MODEL_PATH,
     persist_directory = PERSIST_DIRECTORY
 )
 

@@ -54,7 +54,7 @@ def load_chain(
 
     qa_chain = RetrievalQA.from_chain_type(
         llm,
-        retriever=vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 5}),
+        retriever=vectordb.as_retriever(search_type="similarity", search_kwargs={"k": 4, "score_threshold": 0.15, "fetch_k": 20}),
         return_source_documents=True,
         chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
     )
