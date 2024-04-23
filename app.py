@@ -1,14 +1,15 @@
 import os
-from create_db import create_db
-from load_model import load_vectordb
 from infer_engine import InferEngine, LmdeployConfig
+from create_db import create_vectordb, load_vectordb, similarity_search
 import gradio as gr
 from typing import Generator, Any
-from utils import get_filename, format_references, download_dataset
+from utils import download_dataset
+
 
 print("*" * 100)
 os.system("pip list")
 print("*" * 100)
+
 
 print("gradio version: ", gr.__version__)
 
@@ -25,7 +26,7 @@ if not os.path.exists(DATA_PATH):
 # 不存在才创建,原因是应用自启动可能会重新写入数据库
 if not os.path.exists(PERSIST_DIRECTORY):
     # 创建向量数据库
-    create_db(
+    create_vectordb(
         tar_dirs = DATA_PATH,
         embedding_dir = EMBEDDING_DIR,
         persist_directory = PERSIST_DIRECTORY
@@ -75,7 +76,7 @@ def chat(
     top_p: float = 0.8,
     top_k: int = 40,
     temperature: float = 0.8,
-    similarity_top_k: int = 5,
+    similarity_top_k: int = 4,
     regenerate: bool = False
 ) -> Generator[Any, Any, Any]:
     # 重新生成时要把最后的query和response弹出,重用query
@@ -99,17 +100,16 @@ def chat(
     # 只有第一轮才使用rag
     if len(history) == 0:
         # similarity search
-        docuemnts = vectordb.similarity_search(query=query, k=similarity_top_k)
-        similarity_documents = "\n".join([doc.page_content for doc in docuemnts])
-        # 获取参考文档并去重
-        similarity_documents_references = list(set([get_filename(doc.metadata['source']) for doc in docuemnts]))
-        print(similarity_documents_references)
-        similarity_documents_references = format_references(similarity_documents_references)
-        prompt = TEMPLATE.format(context=similarity_documents, question=query)
+        documents_str, references_str = similarity_search(
+            vectordb = vectordb,
+            query = query,
+            similarity_top_k = similarity_top_k,
+        )
+        prompt = TEMPLATE.format(context=documents_str, question=query)
         print(prompt)
     else:
         prompt = query
-        similarity_documents_references = ""
+        references_str = ""
 
     print(f"query: {query}; response: ", end="", flush=True)
     length = 0
@@ -125,7 +125,7 @@ def chat(
         length = len(response)
         yield history
     # 加上参考文档
-    yield history[:-1] + [[query, response + similarity_documents_references]]
+    yield history[:-1] + [[query, response + references_str]]
     print("\n")
 
 
@@ -184,7 +184,7 @@ def main():
                     similarity_top_k = gr.Slider(
                         minimum=1,
                         maximum=20,
-                        value=5,
+                        value=4,
                         step=1,
                         label='Similar_Top_k'
                     )
@@ -247,9 +247,8 @@ def main():
             )
 
         gr.Markdown("""提醒：<br>
-        1. 使用中如果出现异常，将会在文本输入框进行展示，请不要惊慌。<br>
-        2. 第一次输入会使用 RAG 进行检索,后续对话是在 RAG 的检索结果基础上进行的。<br>
-        3. 源码地址：https://github.com/NagatoYuki0943/medical-rag
+        1. 第一次输入会使用 RAG 进行检索,后续对话是在 RAG 的检索结果基础上进行的。<br>
+        2. 源码地址：https://github.com/NagatoYuki0943/medical-rag
         """)
 
     # threads to consume the request

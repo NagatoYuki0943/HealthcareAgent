@@ -53,33 +53,3 @@ def load_model(
 
     print(f"model.device: {model.device}, model.dtype: {model.dtype}")
     return tokenizer, model
-
-
-def load_vectordb(
-    embedding_dir: str,
-    persist_directory: str,
-) -> Chroma:
-    # 加载开源词向量模型
-    embeddings = HuggingFaceEmbeddings(model_name=embedding_dir)
-    # 加载数据库
-    vectordb = Chroma(
-        embedding_function=embeddings,
-        persist_directory=persist_directory,
-    )
-    return vectordb
-
-
-if __name__ == '__main__':
-    # clone 模型
-    pretrained_model_name_or_path = "../models/internlm2-chat-1_8b"
-    # os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-1.8b {pretrained_model_name_or_path}')
-    # os.system(f'cd {pretrained_model_name_or_path} && git lfs pull')
-    adapter_dir = None
-
-    # 量化
-    load_in_8bit = False
-    load_in_4bit = False
-
-    tokenizer, model = load_model(pretrained_model_name_or_path, adapter_dir, load_in_8bit, load_in_4bit)
-    print(tokenizer)
-    print(model)
