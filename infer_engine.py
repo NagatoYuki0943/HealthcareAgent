@@ -134,6 +134,7 @@ class InferEngine:
         print("lmdeploy version: ", lmdeploy.__version__)
 
         assert backend in ['turbomind', 'pytorch'], f"backend must be 'turbomind' or 'pytorch', but got {backend}"
+        assert model_format in ['hf', 'llama', 'awq'], f"model_format must be 'hf' or 'llama' or 'awq', but got {model_format}"
 
         if backend == 'turbomind':
             # 可以直接使用transformers的模型,会自动转换格式
