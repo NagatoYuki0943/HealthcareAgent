@@ -166,43 +166,6 @@ def main():
                 chatbot = gr.Chatbot(height=500, show_copy_button=True)
 
                 with gr.Row():
-                    max_new_tokens = gr.Slider(
-                        minimum=1,
-                        maximum=2048,
-                        value=1024,
-                        step=1,
-                        label='Max new tokens'
-                    )
-                    top_p = gr.Slider(
-                        minimum=0.01,
-                        maximum=1,
-                        value=0.8,
-                        step=0.01,
-                        label='Top_p'
-                    )
-                    top_k = gr.Slider(
-                        minimum=1,
-                        maximum=100,
-                        value=40,
-                        step=1,
-                        label='Top_k'
-                    )
-                    temperature = gr.Slider(
-                        minimum=0.01,
-                        maximum=1.5,
-                        value=0.8,
-                        step=0.01,
-                        label='Temperature'
-                    )
-                    similarity_top_k = gr.Slider(
-                        minimum=1,
-                        maximum=20,
-                        value=4,
-                        step=1,
-                        label='Similar_Top_k'
-                    )
-
-                with gr.Row():
                     # 创建一个文本框组件，用于输入 prompt。
                     query = gr.Textbox(label="Prompt/问题")
                     # 创建提交按钮。
@@ -216,6 +179,45 @@ def main():
                     undo = gr.Button("↩️ Undo", variant="secondary")
                     # 创建一个清除按钮，用于清除聊天机器人组件的内容。
                     clear = gr.ClearButton(components=[chatbot], value="🗑️ Clear", variant="stop")
+
+                # 折叠
+                with gr.Accordion("Advanced Options", open=False):
+                    with gr.Row():
+                        max_new_tokens = gr.Slider(
+                            minimum=1,
+                            maximum=2048,
+                            value=1024,
+                            step=1,
+                            label='Max new tokens'
+                        )
+                        top_p = gr.Slider(
+                            minimum=0.01,
+                            maximum=1,
+                            value=0.8,
+                            step=0.01,
+                            label='Top_p'
+                        )
+                        top_k = gr.Slider(
+                            minimum=1,
+                            maximum=100,
+                            value=40,
+                            step=1,
+                            label='Top_k'
+                        )
+                        temperature = gr.Slider(
+                            minimum=0.01,
+                            maximum=1.5,
+                            value=0.8,
+                            step=0.01,
+                            label='Temperature'
+                        )
+                        similarity_top_k = gr.Slider(
+                            minimum=1,
+                            maximum=20,
+                            value=4,
+                            step=1,
+                            label='Similar_Top_k'
+                        )
 
             # 回车提交
             query.submit(
