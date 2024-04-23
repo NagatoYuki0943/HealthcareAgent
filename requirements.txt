@@ -15,3 +15,4 @@ pypdf==4.2.0
 # python-docx==1.1.0 # doc,docx
 lmdeploy==0.3.0
 openxlab==0.0.38
+pysqlite3-binary==0.5.2.post3

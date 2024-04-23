@@ -1,3 +1,8 @@
+# fix chroma sqlite3 error
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import os
 from infer_engine import InferEngine, LmdeployConfig
 from create_db import create_vectordb, load_vectordb, similarity_search
@@ -5,7 +10,6 @@ import gradio as gr
 from typing import Generator, Any
 from utils import download_dataset
 from huggingface_hub import hf_hub_download, snapshot_download
-
 
 print("*" * 100)
 os.system("pip list")
@@ -19,18 +23,17 @@ DATA_PATH = "./data"
 EMBEDDING_DIR = "./models/sentence-transformer"
 PERSIST_DIRECTORY = "./vector_db/chroma"
 
-if not os.path.exists(EMBEDDING_DIR):
-    snapshot_download(
-        repo_id = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-        local_dir = EMBEDDING_DIR,
-        resume_download = True,
-        max_workers = 8,
-        endpoint = "https://hf-mirror.com",
-    )
+# 下载embedding模型,不会重复下载
+snapshot_download(
+    repo_id = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    local_dir = EMBEDDING_DIR,
+    resume_download = True,
+    max_workers = 8,
+    endpoint = "https://hf-mirror.com",
+)
 
-if not os.path.exists(DATA_PATH):
-    # 下载数据集
-    download_dataset(target_path = DATA_PATH)
+# 下载数据集,不会重复下载
+download_dataset(target_path = DATA_PATH)
 
 # 不存在才创建,原因是应用自启动可能会重新写入数据库
 if not os.path.exists(PERSIST_DIRECTORY):
