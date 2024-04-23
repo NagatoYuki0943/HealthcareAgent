@@ -1,4 +1,5 @@
 gradio>4.0.0
+huggingface_hub==0.22.2
 transformers==4.38.2
 peft==0.9.0
 sentence-transformers==2.7.0
