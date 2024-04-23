@@ -4,6 +4,7 @@ from create_db import create_vectordb, load_vectordb, similarity_search
 import gradio as gr
 from typing import Generator, Any
 from utils import download_dataset
+from huggingface_hub import hf_hub_download, snapshot_download
 
 
 print("*" * 100)
@@ -18,6 +19,14 @@ DATA_PATH = "./data"
 EMBEDDING_DIR = "./models/sentence-transformer"
 PERSIST_DIRECTORY = "./vector_db/chroma"
 
+
+snapshot_download(
+    repo_id = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    local_dir = EMBEDDING_DIR,
+    resume_download = True,
+    max_workers = 8,
+    endpoint = "https://hf-mirror.com",
+)
 
 if not os.path.exists(DATA_PATH):
     # 下载数据集
