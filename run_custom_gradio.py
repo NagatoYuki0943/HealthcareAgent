@@ -108,7 +108,7 @@ def chat(
     # 加上参考文档
     yield history + [[query, response + references_str]]
     print(references_str + "\n")
-    print("history: ", history)
+    print("history: ", history + [[query, response + references_str]])
 
 
 def revocery(history: list = []) -> tuple[str, list]:
