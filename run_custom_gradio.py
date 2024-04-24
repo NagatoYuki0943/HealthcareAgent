@@ -153,8 +153,8 @@ def main():
     with block as demo:
         with gr.Row(equal_height=True):
             with gr.Column(scale=15):
-                gr.Markdown("""<h1><center>InternLM</center></h1>
-                    <center>Medical-RAG</center>
+                gr.Markdown("""<h1><center>Healthcare Agent</center></h1>
+                    <center>Healthcare Agent</center>
                     """)
             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
 
