@@ -6,7 +6,7 @@ from langchain_community.document_loaders import (
     PyPDFLoader,
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_core.vectorstores import VectorStore
+from langchain_core.vectorstores import VectorStore, VectorStoreRetriever
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 import os
@@ -97,10 +97,12 @@ def create_chroma_vectordb(
     vectordb.persist()
 
 
-def load_chroma_vectordb(
+def load_chroma_retriever(
     embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
-    persist_directory: str = "./vector_db/chroma"
-) -> VectorStore:
+    persist_directory: str = "./vector_db/chroma",
+    similarity_top_k: int = 4,
+    score_threshold: float = 0.15,
+) -> VectorStoreRetriever:
     from langchain_community.vectorstores import Chroma
 
     # 加载开源词向量模型
@@ -118,7 +120,13 @@ def load_chroma_vectordb(
         persist_directory = persist_directory,
     )
 
-    return vectordb
+    # 转换为retriever
+    retriever = vectordb.as_retriever(
+        search_type = "similarity_score_threshold",
+        search_kwargs = {"k": similarity_top_k, "score_threshold": score_threshold}
+    )
+
+    return retriever
 
 
 def create_faiss_vectordb(
@@ -163,10 +171,12 @@ def create_faiss_vectordb(
     vectordb.save_local(folder_path = persist_directory)
 
 
-def load_faiss_vectordb(
+def load_faiss_retriever(
     embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
-    persist_directory: str = "./vector_db/faiss"
-) -> VectorStore:
+    persist_directory: str = "./vector_db/faiss",
+    similarity_top_k: int = 4,
+    score_threshold: float = 0.15,
+) -> VectorStoreRetriever:
     from langchain_community.vectorstores import FAISS
     from langchain_community.vectorstores.utils import DistanceStrategy
 
@@ -184,21 +194,25 @@ def load_faiss_vectordb(
         folder_path = persist_directory,
         embeddings = embeddings,
         allow_dangerous_deserialization = True, # 允许读取pickle
-        distance_strategy = DistanceStrategy.EUCLIDEAN_DISTANCE,
+        distance_strategy = DistanceStrategy.MAX_INNER_PRODUCT,  # refer: https://github.com/InternLM/HuixiangDou/blob/main/huixiangdou/service/retriever.py
         normalize_L2 = False,
     )
 
-    return vectordb
+    # search_type: 'similarity', 'similarity_score_threshold', 'mmr'
+    retriever = vectordb.as_retriever(
+        search_type = "similarity_score_threshold",
+        search_kwargs = {"k": similarity_top_k, "score_threshold": score_threshold, "fetch_k": similarity_top_k  * 5}
+    )
+
+    return retriever
 
 
 def similarity_search(
-    vectordb: VectorStore,
+    retriever: VectorStoreRetriever,
     query: str,
-    similarity_top_k: int = 4,
-) -> tuple[str, list, str]:
+) -> tuple[str, str]:
     # similarity search
-    documents_with_score = vectordb.similarity_search_with_score(query=query, k=similarity_top_k)
-    documents, scores = zip(*documents_with_score)
+    documents = retriever.invoke(query)
     documents_str = "\n".join([doc.page_content for doc in documents])
     # 获取参考文档并去重
     references = list(set([get_filename(doc.metadata['source']) for doc in documents]))
@@ -206,9 +220,39 @@ def similarity_search(
     return documents_str, references_str
 
 
-if __name__ == "__main__":
+def test_chroma():
     # create_chroma_vectordb()
-    load_chroma_vectordb()
 
+    retriever = load_chroma_retriever()
+
+    documents_str, references_str = similarity_search(retriever, "Eye Pressure Lowering Effect of Vitamin C")
+    print(f"{len(documents_str) = }")
+    print(references_str)
+
+    print("-"*100)
+
+    documents_str, references_str = similarity_search(retriever, "今天吃了吗")
+    print(f"{len(documents_str) = }")
+    print(references_str)
+
+
+def test_faiss():
     # create_faiss_vectordb()
-    load_faiss_vectordb()
+    retriever = load_faiss_retriever()
+
+    documents_str, references_str = similarity_search(retriever, "Eye Pressure Lowering Effect of Vitamin C")
+    print(f"{len(documents_str) = }")
+    print(references_str)
+
+    print("-"*100)
+
+    documents_str, references_str = similarity_search(retriever, "今天吃了吗")
+    print(f"{len(documents_str) = }")
+    print(references_str)
+
+
+if __name__ == "__main__":
+    test_chroma()
+    print("#" * 100)
+    test_faiss()
+

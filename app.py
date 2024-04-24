@@ -6,7 +6,7 @@
 
 import os
 from infer_engine import InferEngine, LmdeployConfig
-from create_db import create_faiss_vectordb, load_faiss_vectordb, similarity_search
+from create_db import create_faiss_vectordb, load_faiss_retriever, similarity_search
 import gradio as gr
 from typing import Generator, Any
 from utils import download_dataset
@@ -23,6 +23,8 @@ print("gradio version: ", gr.__version__)
 DATA_PATH = "./data"
 EMBEDDING_MODEL_PATH = "./models/paraphrase-multilingual-MiniLM-L12-v2"
 PERSIST_DIRECTORY = "./vector_db/faiss"
+SIMILARITY_TOP_K = 4
+SCORE_THRESHOLD = 0.15
 
 # 下载embedding模型,不会重复下载
 snapshot_download(
@@ -45,9 +47,11 @@ if not os.path.exists(PERSIST_DIRECTORY):
     )
 
 # 载入向量数据库
-vectordb = load_faiss_vectordb(
+retriever = load_faiss_retriever(
     embedding_model_path = EMBEDDING_MODEL_PATH,
-    persist_directory = PERSIST_DIRECTORY
+    persist_directory = PERSIST_DIRECTORY,
+    similarity_top_k = SIMILARITY_TOP_K,
+    score_threshold = SCORE_THRESHOLD
 )
 
 # clone 模型
@@ -88,7 +92,6 @@ def chat(
     top_p: float = 0.8,
     top_k: int = 40,
     temperature: float = 0.8,
-    similarity_top_k: int = 4,
     regenerate: bool = False
 ) -> Generator[Any, Any, Any]:
     # 重新生成时要把最后的query和response弹出,重用query
@@ -105,19 +108,15 @@ def chat(
             yield history
             return
 
-    print({
-        "similarity_top_k": similarity_top_k
-    })
-
-    # 只有第一轮才使用rag
-    if len(history) == 0:
+    # 只有第一轮或者之前没有检索到信息才使用rag
+    # history[-1][1] 代表最后一次回答
+    if len(history) == 0 or history[-1][1].endswith("no reference."):
         # similarity search
         documents_str, references_str = similarity_search(
-            vectordb = vectordb,
+            retriever = retriever,
             query = query,
-            similarity_top_k = similarity_top_k,
         )
-        prompt = TEMPLATE.format(context=documents_str, question=query)
+        prompt = TEMPLATE.format(context = documents_str, question = query)
         print(prompt)
     else:
         prompt = query
@@ -138,7 +137,7 @@ def chat(
         yield history
     # 加上参考文档
     yield history[:-1] + [[query, response + references_str]]
-    print("\n")
+    print(references_str + "\n")
 
 
 def revocery(history: list = []) -> tuple[str, list]:
@@ -210,18 +209,11 @@ def main():
                             step=0.01,
                             label='Temperature'
                         )
-                        similarity_top_k = gr.Slider(
-                            minimum=1,
-                            maximum=20,
-                            value=4,
-                            step=1,
-                            label='Similar_Top_k'
-                        )
 
             # 回车提交
             query.submit(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, similarity_top_k],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature],
                 outputs=[chatbot]
             )
 
@@ -235,7 +227,7 @@ def main():
             # 按钮提交
             submit.click(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, similarity_top_k],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature],
                 outputs=[chatbot]
             )
 
@@ -249,7 +241,7 @@ def main():
             # 重新生成
             regen.click(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, similarity_top_k, regen],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, regen],
                 outputs=[chatbot]
             )
 
@@ -261,7 +253,7 @@ def main():
             )
 
         gr.Markdown("""提醒：<br>
-        1. 第一次输入会使用 RAG 进行检索,后续对话是在 RAG 的检索结果基础上进行的。<br>
+        1. 每次对话只会进行一次 RAG 进行检索，当出现参考文本时说明使用了 RAG，后续对话是在 RAG 的检索结果基础上进行的。<br>
         2. 源码地址：https://github.com/NagatoYuki0943/medical-rag
         """)
 
