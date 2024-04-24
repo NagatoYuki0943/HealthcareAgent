@@ -1,4 +1,3 @@
-# 首先导入所需第三方库
 from langchain_community.document_loaders import (
     UnstructuredFileLoader,
     UnstructuredMarkdownLoader,
@@ -6,14 +5,13 @@ from langchain_community.document_loaders import (
     PyPDFLoader,
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_core.vectorstores import VectorStore, VectorStoreRetriever
+from langchain_core.vectorstores import VectorStoreRetriever
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 import os
 from utils import get_filename, format_references
 
 
-# 获取文件路径函数
 # 获取文件路径函数
 def get_files(dir_path: str) -> list:
     # args：dir_path，目标文件夹路径
@@ -85,6 +83,7 @@ def create_chroma_vectordb(
             'normalize_embeddings': True
         }
     )
+    embeddings.client = embeddings.client.half()
 
     # 构建向量数据库
     vectordb = Chroma.from_documents(
@@ -113,6 +112,7 @@ def load_chroma_retriever(
             'normalize_embeddings': True
         }
     )
+    embeddings.client = embeddings.client.half()
 
     # 加载数据库
     vectordb = Chroma(
@@ -160,6 +160,7 @@ def create_faiss_vectordb(
             'normalize_embeddings': True
         }
     )
+    embeddings.client = embeddings.client.half()
 
     # 构建向量数据库
     vectordb = FAISS.from_documents(
@@ -188,12 +189,14 @@ def load_faiss_retriever(
             'normalize_embeddings': True
         }
     )
+    embeddings.client = embeddings.client.half()
 
     # 加载数据库
     vectordb = FAISS.load_local(
         folder_path = persist_directory,
         embeddings = embeddings,
         allow_dangerous_deserialization = True, # 允许读取pickle
+        # faiss 仅支持 EUCLIDEAN_DISTANCE MAX_INNER_PRODUCT COSINE
         distance_strategy = DistanceStrategy.MAX_INNER_PRODUCT,  # refer: https://github.com/InternLM/HuixiangDou/blob/main/huixiangdou/service/retriever.py
         normalize_L2 = False,
     )
@@ -212,7 +215,7 @@ def similarity_search(
     query: str,
 ) -> tuple[str, str]:
     # similarity search
-    documents = retriever.invoke(query)
+    documents = retriever.get_relevant_documents(query)
     documents_str = "\n".join([doc.page_content for doc in documents])
     # 获取参考文档并去重
     references = list(set([get_filename(doc.metadata['source']) for doc in documents]))

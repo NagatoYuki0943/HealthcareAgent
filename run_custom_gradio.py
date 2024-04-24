@@ -1,6 +1,6 @@
 import os
 from infer_engine import InferEngine, TransformersConfig
-from create_db import load_faiss_retriever, similarity_search
+from database import VectorDatabase
 import gradio as gr
 from typing import Generator, Any
 
@@ -8,18 +8,31 @@ from typing import Generator, Any
 print("gradio version: ", gr.__version__)
 
 
-EMBEDDING_MODEL_PATH = "./models/paraphrase-multilingual-MiniLM-L12-v2"
+DATA_PATH = "./data"
+EMBEDDING_MODEL_PATH = "./models/bce-embedding-base_v1"
+RERANKER_MODEL_PATH : str = "./models/bce-reranker-base_v1"
 PERSIST_DIRECTORY = "./vector_db/faiss"
-SIMILARITY_TOP_K = 4
+SIMILARITY_TOP_K = 7
 SCORE_THRESHOLD = 0.15
+ALLOW_SUFFIX = (".pdf")
 
-# 载入向量数据库
-retriever = load_faiss_retriever(
+vector_database = VectorDatabase(
+    data_path = DATA_PATH,
     embedding_model_path = EMBEDDING_MODEL_PATH,
+    reranker_model_path = RERANKER_MODEL_PATH,
     persist_directory = PERSIST_DIRECTORY,
     similarity_top_k = SIMILARITY_TOP_K,
-    score_threshold = SCORE_THRESHOLD
+    score_threshold = SCORE_THRESHOLD,
+    allow_suffix = ALLOW_SUFFIX
 )
+# 创建数据库
+vector_database.create_faiss_vectordb()
+# 载入数据库(创建数据库后不需要载入也可以)
+vector_database.load_faiss_vectordb()
+# 创建相似度 retriever
+# vector_database.create_faiss_retriever()
+# 创建重排序 retriever
+vector_database.create_faiss_reranker_retriever()
 
 # clone 模型
 PRETRAINED_MODEL_NAME_OR_PATH = './models/internlm2-chat-1_8b'
@@ -30,17 +43,28 @@ ADAPTER_DIR = None
 LOAD_IN_8BIT= False
 LOAD_IN_4BIT = False
 
-SYSTEM_PROMPT = "你现在是一名医生，具备丰富的医学知识和临床经验。你擅长诊断和治疗各种疾病，能为病人提供专业的医疗建议。你有良好的沟通技巧，能与病人和他们的家人建立信任关系。请在这个角色下为我解答以下问题。"
+SYSTEM_PROMPT = """你现在是一名医生，具备丰富的医学知识和临床经验。你擅长诊断和治疗各种疾病，能为病人提供专业的医疗建议。你有良好的沟通技巧，能与病人和他们的家人建立信任关系。请在这个角色下为我解答以下问题。
+You are now a doctor with extensive medical knowledge and clinical experience. You are adept at diagnosing and treating various diseases and can provide professional medical advice to patients. You have good communication skills and can establish a trust relationship with patients and their families. Please answer the following questions for me in this role.
+"""
 
-REJECT_ANSWER = "对不起，我无法回答您的问题。如果您有其他问题，欢迎随时向我提问，我会在我能力范围内尽力为您解答。"
+REJECT_ANSWER_ZH = "对不起，我无法回答您的问题。如果您有其他问题，欢迎随时向我提问，我会在我能力范围内尽力为您解答。"
+REJECT_ANSWER_EN = "Sorry, I can't answer your question. If you have any other questions, please feel free to ask me questions and I will try my best to answer them for you."
 
-TEMPLATE = """请使用以下提供的上下文来回答用户的问题。如果无法从上下文中得到答案，请回答你不知道，并总是使用中文回答。
-提供的上下文：
+TEMPLATE_ZH = """请使用以下提供的上下文来回答用户的问题。如果无法从上下文中得到答案，请回答你不知道，并总是使用中文回答。
+提供的上下文:
 ···
 {context}
 ···
 用户的问题: {question}
 你给的回答:"""
+
+TEMPLATE_EN = """Please use the context provided below to answer the user's question. If you can't get the answer from the context, answer you don't know, and always answer in English.
+context provided:
+···
+{context}
+···
+user's question: {question}
+your answer:"""
 
 TRANSFORMERS_CONFIG = TransformersConfig(
     pretrained_model_name_or_path = PRETRAINED_MODEL_NAME_OR_PATH,
@@ -64,6 +88,7 @@ def chat(
     top_p: float = 0.8,
     top_k: int = 40,
     temperature: float = 0.8,
+    language: str = "ZH",
     regenerate: bool = False
 ) -> Generator[Any, Any, Any]:
     # 重新生成时要把最后的query和response弹出,重用query
@@ -80,19 +105,23 @@ def chat(
             yield history
             return
 
+    # 选择语言
+    reject_answer = REJECT_ANSWER_ZH if language == "ZH" else REJECT_ANSWER_EN
+    template = TEMPLATE_ZH if language == "ZH" else TEMPLATE_EN
+
     # similarity search
-    documents_str, references_str = similarity_search(
-        retriever = retriever,
+    documents_str, references_str = vector_database.similarity_search(
         query = query,
     )
     # 没有找到相关文档,返回拒绝问题
     if documents_str == "":
-        yield history + [[query, REJECT_ANSWER]]
+        yield history + [[query, reject_answer]]
+        print(f"\033[0;32;40mhistory: {history + [[query, reject_answer]]}\033[0m")
         return
-    prompt = TEMPLATE.format(context = documents_str, question = query)
-    print(prompt)
+    prompt = template.format(context = documents_str, question = query)
+    print(f"\033[0;34;40mprompt:\n{prompt}\033[0m")
 
-    print(f"query: {query}; response: ", end="", flush=True)
+    print(f"\033[0;33;40mquery: {query}; \nresponse: \033[0m", end="", flush=True)
     length = 0
     for response, _history in infer_engine.chat_stream(
         query = prompt,
@@ -102,13 +131,13 @@ def chat(
         top_k = top_k,
         temperature = temperature,
     ):
-        print(response[length:], flush=True, end="")
+        print(f"\033[0;33;40m{response[length:]}\033[0m", flush=True, end="")
         length = len(response)
         yield history + [[query, response]]
     # 加上参考文档
     yield history + [[query, response + references_str]]
-    print(references_str + "\n")
-    print("history: ", history + [[query, response + references_str]])
+    print(f"\033[0;36;40m{references_str}\033[0m")
+    print(f"\033[0;32;40mhistory: {history + [[query, response + references_str]]}\033[0m")
 
 
 def revocery(history: list = []) -> tuple[str, list]:
@@ -136,13 +165,15 @@ def main():
 
                 with gr.Row():
                     # 创建一个文本框组件，用于输入 prompt。
-                    query = gr.Textbox(label="Prompt/问题", placeholder="请输入你的问题，按 Enter 或者右边的按钮提交，按 Shift + Enter 可以换行")
+                    query = gr.Textbox(label="Prompt/问题", placeholder="Enter 发送; Shift + Enter 换行 / Enter to send; Shift + Enter to wrap")
                     # 创建提交按钮。
                     # variant https://www.gradio.app/docs/button
                     # scale https://www.gradio.app/guides/controlling-layout
                     submit = gr.Button("💬 Chat", variant="primary", scale=0)
 
                 with gr.Row():
+                    # 下拉框
+                    language = gr.Dropdown(choices=[("中文", "ZH"), ("English", "EN")], value="ZH", label="Language", type="value", interactive=True)
                     # 创建一个重新生成按钮，用于重新生成当前对话内容。
                     regen = gr.Button("🔄 Retry", variant="secondary")
                     undo = gr.Button("↩️ Undo", variant="secondary")
@@ -184,7 +215,7 @@ def main():
             # 回车提交
             query.submit(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language],
                 outputs=[chatbot]
             )
 
@@ -198,7 +229,7 @@ def main():
             # 按钮提交
             submit.click(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language],
                 outputs=[chatbot]
             )
 
@@ -212,7 +243,7 @@ def main():
             # 重新生成
             regen.click(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, regen],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language, regen],
                 outputs=[chatbot]
             )
 

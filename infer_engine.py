@@ -145,7 +145,7 @@ class InferEngine:
                 tp = 1,
                 session_len = 8192,
                 max_batch_size = 128,
-                cache_max_entry_count = 0.8,    # 调整KV Cache的占用比例为0.8
+                cache_max_entry_count = 0.75,    # 调整KV Cache的占用比例为0.75
                 cache_block_seq_len = 64,
                 quant_policy = 0,               # 4 表示 kv int4 量化, 8 表示 kv int8 量化
                 rope_scaling_factor = 0.0,

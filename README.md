@@ -16,7 +16,7 @@
 
 4. 建立向量数据库
 
-运行`create_db.py`或者 `create_db.ipynb`建立数据库
+运行`create_db_faiss_reranker.ipynb`建立数据库
 
 5. 运行
 
@@ -28,16 +28,12 @@
 
 `app.py` 内容和 `run_custom_gradio.py` 相同，不同点是会下载数据集，创建数据库，下载模型并运行，并使用了 lmdeploy 加速
 
-## 注意
-
-当前模型在推理时只有第一次对话会进行rag检索，后续聊天是在之前基础上做的。
-
 ## TODO
 
 - [x] 返回参考文档
 - [x] 当前使用 transformers 库进行推理，速度较慢，可以换成 lmdeploy 库进行加速
 - [x] 当查询库中没有对应数据时说明找不到内容
-- [ ] 加上重排序模型
+- [x] 加上重排序模型
 
 
 
