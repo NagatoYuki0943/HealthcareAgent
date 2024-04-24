@@ -50,21 +50,21 @@ You are now a doctor with extensive medical knowledge and clinical experience. Y
 REJECT_ANSWER_ZH = "对不起，我无法回答您的问题。如果您有其他问题，欢迎随时向我提问，我会在我能力范围内尽力为您解答。"
 REJECT_ANSWER_EN = "Sorry, I can't answer your question. If you have any other questions, please feel free to ask me questions and I will try my best to answer them for you."
 
-TEMPLATE_ZH = """请使用以下提供的上下文来回答用户的问题。如果无法从上下文中得到答案，请回答你不知道，并总是使用中文回答。
+TEMPLATE_ZH = """请使用以下提供的上下文来回答用户的问题。如果无法从上下文中得到答案，请回答你不知道。
 提供的上下文:
 ···
 {context}
 ···
 用户的问题: {question}
-你给的回答:"""
+请你使用中文回答:"""
 
-TEMPLATE_EN = """Please use the context provided below to answer the user's question. If you can't get the answer from the context, answer you don't know, and always answer in English.
+TEMPLATE_EN = """Please use the context provided below to answer the user's question. If you can't get the answer from the context, answer you don't know.
 context provided:
 ···
 {context}
 ···
 user's question: {question}
-your answer:"""
+please answer in English:"""
 
 TRANSFORMERS_CONFIG = TransformersConfig(
     pretrained_model_name_or_path = PRETRAINED_MODEL_NAME_OR_PATH,
