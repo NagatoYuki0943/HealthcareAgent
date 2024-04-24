@@ -1,6 +1,23 @@
 import os
 
 
+def is_used_rag(
+    reject_answer: str,
+    history: list = [],
+) -> bool:
+    """是否使用过rag"""
+    if len(history) == 0:
+        return False
+    prompts, responses = zip(*history)
+    # 去重回答
+    responses = list(set(responses))
+    # 经过去重之后只有一种回答,并且回答是拒绝回答说明没使用rag
+    if len(responses) == 1 and responses[0] == reject_answer:
+        return False
+    else:
+        return True
+
+
 def get_filename(path: str):
     """
     './data\\FM docs 2024.3\\JOM_1998_13_4_06_The_Application_of_the_Hardin_Jones-Pauling-.pdf'

@@ -57,18 +57,6 @@ infer_engine = InferEngine(
 )
 
 
-def is_used_rag(history: list = []) -> bool:
-    """是否使用过rag"""
-    prompts, responses = zip(*history)
-    # 去重回答
-    responses = list(set(responses))
-    # 经过去重之后只有一种回答,并且回答是拒绝回答说明没使用rag
-    if len(responses) == 1 and responses[0] == REJECT_ANSWER:
-        return False
-    else:
-        return True
-
-
 def chat(
     query: str,
     history: list = [],  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
@@ -92,28 +80,22 @@ def chat(
             yield history
             return
 
-    # 只有第一轮或者之前没有检索到信息才使用rag
-    # history[-1][1] 代表最后一次回答
-    if len(history) == 0 or not is_used_rag(history):
-        # similarity search
-        documents_str, references_str = similarity_search(
-            retriever = retriever,
-            query = query,
-        )
-        # 没有找到相关文档,返回拒绝问题
-        if documents_str == "":
-            yield history + [[query, REJECT_ANSWER]]
-            return
-        prompt = TEMPLATE.format(context = documents_str, question = query)
-        print(prompt)
-    else:
-        prompt = query
-        references_str = ""
+    # similarity search
+    documents_str, references_str = similarity_search(
+        retriever = retriever,
+        query = query,
+    )
+    # 没有找到相关文档,返回拒绝问题
+    if documents_str == "":
+        yield history + [[query, REJECT_ANSWER]]
+        return
+    prompt = TEMPLATE.format(context = documents_str, question = query)
+    print(prompt)
 
     print(f"query: {query}; response: ", end="", flush=True)
     length = 0
-    for response, history in infer_engine.chat_stream(
-        query = query,
+    for response, _history in infer_engine.chat_stream(
+        query = prompt,
         history = history,
         max_new_tokens = max_new_tokens,
         top_p = top_p,
@@ -122,10 +104,11 @@ def chat(
     ):
         print(response[length:], flush=True, end="")
         length = len(response)
-        yield history
+        yield history + [[query, response]]
     # 加上参考文档
-    yield history[:-1] + [[query, response + references_str]]
+    yield history + [[query, response + references_str]]
     print(references_str + "\n")
+    print("history: ", history)
 
 
 def revocery(history: list = []) -> tuple[str, list]:
@@ -241,7 +224,7 @@ def main():
             )
 
         gr.Markdown("""提醒：<br>
-        1. 每次对话只会进行一次 RAG 进行检索，当出现参考文本时说明使用了 RAG，后续对话是在 RAG 的检索结果基础上进行的。<br>
+        1. 每次对话都会使用 RAG 进行检索。<br>
         2. 源码地址：https://github.com/NagatoYuki0943/medical-rag
         """)
 
