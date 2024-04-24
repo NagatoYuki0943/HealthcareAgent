@@ -31,6 +31,7 @@ ALLOW_SUFFIX = (".pdf")
 
 # 下载 embedding 和 reranker 模型,不会重复下载
 hf_token = os.getenv("HF_TOKEN", "")
+print(f"hf_token = {hf_token}")
 snapshot_download(
     repo_id = "maidalun1020/bce-embedding-base_v1",
     local_dir = EMBEDDING_MODEL_PATH,
