@@ -32,6 +32,8 @@ LOAD_IN_4BIT = False
 
 SYSTEM_PROMPT = "你现在是一名医生，具备丰富的医学知识和临床经验。你擅长诊断和治疗各种疾病，能为病人提供专业的医疗建议。你有良好的沟通技巧，能与病人和他们的家人建立信任关系。请在这个角色下为我解答以下问题。"
 
+REJECT_ANSWER = "对不起，我无法回答您的问题。如果您有其他问题，欢迎随时向我提问，我会在我能力范围内尽力为您解答。"
+
 TEMPLATE = """请使用以下提供的上下文来回答用户的问题。如果无法从上下文中得到答案，请回答你不知道，并总是使用中文回答。
 提供的上下文：
 ···
@@ -53,6 +55,18 @@ infer_engine = InferEngine(
     backend = 'transformers', # transformers, lmdeploy
     transformers_config = TRANSFORMERS_CONFIG,
 )
+
+
+def is_used_rag(history: list = []) -> bool:
+    """是否使用过rag"""
+    prompts, responses = zip(*history)
+    # 去重回答
+    responses = list(set(responses))
+    # 经过去重之后只有一种回答,并且回答是拒绝回答说明没使用rag
+    if len(responses) == 1 and responses[0] == REJECT_ANSWER:
+        return False
+    else:
+        return True
 
 
 def chat(
@@ -80,12 +94,16 @@ def chat(
 
     # 只有第一轮或者之前没有检索到信息才使用rag
     # history[-1][1] 代表最后一次回答
-    if len(history) == 0 or history[-1][1].endswith("no reference."):
+    if len(history) == 0 or not is_used_rag(history):
         # similarity search
         documents_str, references_str = similarity_search(
             retriever = retriever,
             query = query,
         )
+        # 没有找到相关文档,返回拒绝问题
+        if documents_str == "":
+            yield history + [[query, REJECT_ANSWER]]
+            return
         prompt = TEMPLATE.format(context = documents_str, question = query)
         print(prompt)
     else:
