@@ -1,4 +1,4 @@
-# medical-rag
+# HealthcareAgent
 
 使用rag对医学数据进行检索
 
