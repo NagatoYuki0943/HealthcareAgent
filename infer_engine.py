@@ -110,8 +110,8 @@ class InferEngine:
             f"backend must be 'turbomind' or 'pytorch', but got {config.backend}"
         assert config.model_format in ['hf', 'llama', 'awq'], \
             f"model_format must be 'hf' or 'llama' or 'awq', but got {config.model_format}"
-        assert config.cache_max_entry_count >= 0 and config.cache_max_entry_count <= 1.0, \
-            f"cache_max_entry_count must be >= 0 and <= 1.0, but got {config.cache_max_entry_count}"
+        assert config.cache_max_entry_count >= 0.0 and config.cache_max_entry_count <= 1.0, \
+            f"cache_max_entry_count must be >= 0.0 and <= 1.0, but got {config.cache_max_entry_count}"
         assert config.quant_policy in [0, 4, 8], f"quant_policy must be 0, 4 or 8, but got {config.quant_policy}"
 
         if config.backend == 'turbomind':
