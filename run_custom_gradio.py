@@ -254,10 +254,10 @@ def main():
                 outputs=[query, chatbot]
             )
 
-        gr.Markdown("""提醒：<br>
-        1. 每次对话都会使用 RAG 进行检索。<br>
-        2. 源码地址：https://github.com/NagatoYuki0943/HealthcareAgent
-        """)
+        # gr.Markdown("""提醒：<br>
+        # 1. 每次对话都会使用 RAG 进行检索。<br>
+        # 2. 源码地址：https://github.com/NagatoYuki0943/HealthcareAgent
+        # """)
 
     # threads to consume the request
     gr.close_all()
