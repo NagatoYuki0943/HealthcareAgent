@@ -55,8 +55,18 @@ def get_text(dir_path: str) -> list:
 def create_chroma_vectordb(
     tar_dirs: str = "./data",
     embedding_model_path: str = "./models/bce-embedding-base_v1",
-    persist_directory: str = "./vector_db/chroma"
+    persist_directory: str = "./vector_db/chroma",
+    force: bool = False
 ):
+    if os.path.exists(persist_directory):
+        if not force:
+            print(f"`{persist_directory}` 路径已存在, 无需创建数据库, 直接读取数据库即可, 如果想强制重新传建, 请设置参数 `force = True`")
+            return
+        else:
+            from shutil import rmtree
+            rmtree(persist_directory)
+            print(f"\033[0;31;40m`{persist_directory}` 路径已删除,即将重新创建数据库\033[0m")
+
     from langchain_community.vectorstores import Chroma
 
     dirs = os.listdir(tar_dirs)
@@ -132,8 +142,18 @@ def load_chroma_retriever(
 def create_faiss_vectordb(
     tar_dirs: str = "./data",
     embedding_model_path: str = "./models/bce-embedding-base_v1",
-    persist_directory: str = "./vector_db/faiss"
+    persist_directory: str = "./vector_db/faiss",
+    force: bool = False
 ):
+    if os.path.exists(persist_directory):
+        if not force:
+            print(f"`{persist_directory}` 路径已存在, 无需创建数据库, 直接读取数据库即可, 如果想强制重新传建, 请设置参数 `force = True`")
+            return
+        else:
+            from shutil import rmtree
+            rmtree(persist_directory)
+            print(f"\033[0;31;40m`{persist_directory}` 路径已删除,即将重新创建数据库\033[0m")
+
     from langchain_community.vectorstores import FAISS
 
     dirs = os.listdir(tar_dirs)
@@ -224,7 +244,7 @@ def similarity_search(
 
 
 def test_chroma():
-    # create_chroma_vectordb()
+    create_chroma_vectordb()
 
     retriever = load_chroma_retriever()
 
@@ -240,7 +260,7 @@ def test_chroma():
 
 
 def test_faiss():
-    # create_faiss_vectordb()
+    create_faiss_vectordb()
     retriever = load_faiss_retriever()
 
     documents_str, references_str = similarity_search(retriever, "Eye Pressure Lowering Effect of Vitamin C")
