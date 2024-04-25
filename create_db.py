@@ -54,7 +54,7 @@ def get_text(dir_path: str) -> list:
 
 def create_chroma_vectordb(
     tar_dirs: str = "./data",
-    embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
+    embedding_model_path: str = "./models/bce-embedding-base_v1",
     persist_directory: str = "./vector_db/chroma"
 ):
     from langchain_community.vectorstores import Chroma
@@ -97,7 +97,7 @@ def create_chroma_vectordb(
 
 
 def load_chroma_retriever(
-    embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
+    embedding_model_path: str = "./models/bce-embedding-base_v1",
     persist_directory: str = "./vector_db/chroma",
     similarity_top_k: int = 4,
     score_threshold: float = 0.15,
@@ -131,7 +131,7 @@ def load_chroma_retriever(
 
 def create_faiss_vectordb(
     tar_dirs: str = "./data",
-    embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
+    embedding_model_path: str = "./models/bce-embedding-base_v1",
     persist_directory: str = "./vector_db/faiss"
 ):
     from langchain_community.vectorstores import FAISS
@@ -173,7 +173,7 @@ def create_faiss_vectordb(
 
 
 def load_faiss_retriever(
-    embedding_model_path: str = "./models/paraphrase-multilingual-MiniLM-L12-v2",
+    embedding_model_path: str = "./models/bce-embedding-base_v1",
     persist_directory: str = "./vector_db/faiss",
     similarity_top_k: int = 4,
     score_threshold: float = 0.15,
