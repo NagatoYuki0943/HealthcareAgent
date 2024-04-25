@@ -123,7 +123,7 @@ class InferEngine:
                 tp = 1,
                 session_len = 8192,
                 max_batch_size = 128,
-                cache_max_entry_count = config.cache_max_entry_count,  # 调整 KV Cache的 占用比例为0.8
+                cache_max_entry_count = config.cache_max_entry_count,
                 cache_block_seq_len = 64,
                 quant_policy = config.quant_policy,                    # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
                 rope_scaling_factor = 0.0,
@@ -139,7 +139,7 @@ class InferEngine:
                 tp = 1,
                 session_len = 8192,
                 max_batch_size = 128,
-                cache_max_entry_count = config.cache_max_entry_count,  # 调整 KV Cache的 占用比例为0.8
+                cache_max_entry_count = config.cache_max_entry_count,
                 eviction_type = 'recompute',
                 prefill_interval = 16,
                 block_size = 64,
