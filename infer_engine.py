@@ -5,7 +5,7 @@ from typing import Generator, Any
 @dataclass
 class TransformersConfig:
     pretrained_model_name_or_path: str
-    adapter_dir: str = None
+    adapter_path: str = None
     load_in_8bit: bool = False
     load_in_4bit: bool = False
     system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
@@ -85,13 +85,13 @@ class InferEngine:
             quantization_config = quantization_config if config.load_in_8bit or config.load_in_4bit else None,
         )
 
-        if config.adapter_dir:
-            print(f"load adapter: {config.adapter_dir}")
+        if config.adapter_path:
+            print(f"load adapter: {config.adapter_path}")
             # 2种加载adapter的方式
             # 1. load adapter https://huggingface.co/docs/transformers/main/zh/peft
-            # self.model.load_adapter(adapter_dir)
+            # self.model.load_adapter(adapter_path)
             # 2. https://huggingface.co/docs/peft/main/en/package_reference/peft_model#peft.PeftModel.from_pretrained
-            self.model = PeftModel.from_pretrained(self.model, config.adapter_dir)
+            self.model = PeftModel.from_pretrained(self.model, config.adapter_path)
 
         self.model.eval()
 
