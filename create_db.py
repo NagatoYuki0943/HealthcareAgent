@@ -90,7 +90,7 @@ def create_chroma_vectordb(
         model_name = embedding_model_path,
         model_kwargs = {'device': 'cuda'},
         encode_kwargs = {
-            'normalize_embeddings': True
+            'normalize_embeddings': True    # 尽可能保证相似度在0~1之间
         }
     )
     embeddings.client = embeddings.client.half()
@@ -119,7 +119,7 @@ def load_chroma_retriever(
         model_name = embedding_model_path,
         model_kwargs = {'device': 'cuda'},
         encode_kwargs = {
-            'normalize_embeddings': True
+            'normalize_embeddings': True    # 尽可能保证相似度在0~1之间
         }
     )
     embeddings.client = embeddings.client.half()
@@ -177,7 +177,7 @@ def create_faiss_vectordb(
         model_name = embedding_model_path,
         model_kwargs = {'device': 'cuda'},
         encode_kwargs = {
-            'normalize_embeddings': True
+            'normalize_embeddings': True    # 尽可能保证相似度在0~1之间
         }
     )
     embeddings.client = embeddings.client.half()
@@ -206,7 +206,7 @@ def load_faiss_retriever(
         model_name = embedding_model_path,
         model_kwargs = {'device': 'cuda'},
         encode_kwargs = {
-            'normalize_embeddings': True
+            'normalize_embeddings': True    # 尽可能保证相似度在0~1之间
         }
     )
     embeddings.client = embeddings.client.half()
