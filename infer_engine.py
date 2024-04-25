@@ -19,6 +19,8 @@ class LmdeployConfig:
     model_path: str
     backend: str = 'turbomind' # turbomind, pytorch
     model_format: str = 'hf'
+    cache_max_entry_count: float = 0.8, # 调整 KV Cache 的占用比例为0.8
+    quant_policy: int = 0,              # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     model_name: str = 'internlm2'
     custom_model_name: str = 'internlm2_chat_1_8b'
     system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
@@ -42,34 +44,14 @@ class InferEngine:
 
         if backend == 'transformers':
             assert transformers_config is not None, "transformers_config must not be None when backend is 'transformers'"
-            self.load_transformers_model(
-                transformers_config.pretrained_model_name_or_path,
-                transformers_config.adapter_dir,
-                transformers_config.load_in_8bit,
-                transformers_config.load_in_4bit
-            )
-            print("system_prompt: ", transformers_config.system_prompt)
+            self.load_transformers_model(transformers_config)
             print("transformers model loaded")
         elif backend == 'lmdeploy':
             assert lmdeploy_config is not None, "lmdeploy_config must not be None when backend is 'lmdeploy'"
-            self.load_lmdeploy_model(
-                lmdeploy_config.model_path,
-                lmdeploy_config.backend,
-                lmdeploy_config.model_format,
-                lmdeploy_config.model_name,
-                lmdeploy_config.custom_model_name,
-                lmdeploy_config.system_prompt
-            )
-            print("system_prompt: ", lmdeploy_config.system_prompt)
+            self.load_lmdeploy_model(lmdeploy_config)
             print("lmdeploy model loaded")
 
-    def load_transformers_model(
-        self,
-        pretrained_model_name_or_path: str,
-        adapter_dir: str = None,
-        load_in_8bit: bool = False,
-        load_in_4bit: bool = False,
-    ):
+    def load_transformers_model(self, config: TransformersConfig):
         import torch
         import transformers
         from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
@@ -77,14 +59,15 @@ class InferEngine:
 
         print("torch version: ", torch.__version__)
         print("transformers version: ", transformers.__version__)
+        print(f"transformers config: {config}")
 
         # tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, trust_remote_code = True)
+        self.tokenizer = AutoTokenizer.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
 
         # 量化
         quantization_config = BitsAndBytesConfig(
-            load_in_4bit = load_in_4bit,                # 是否在4位精度下加载模型。如果设置为True，则在4位精度下加载模型。
-            load_in_8bit = False if load_in_4bit else load_in_8bit,
+            load_in_4bit = config.load_in_4bit,                # 是否在4位精度下加载模型。如果设置为True，则在4位精度下加载模型。
+            load_in_8bit = False if config.load_in_4bit else config.load_in_8bit,
             llm_int8_threshold = 6.0,
             llm_int8_has_fp16_weight = False,
             bnb_4bit_compute_dtype = torch.float16,     # 4位精度计算的数据类型。这里设置为torch.float16，表示使用半精度浮点数。
@@ -94,21 +77,21 @@ class InferEngine:
 
         # 创建模型
         self.model = AutoModelForCausalLM.from_pretrained(
-            pretrained_model_name_or_path,
+            config.pretrained_model_name_or_path,
             torch_dtype = torch.float16,
             trust_remote_code = True,
             device_map = 'auto',
             low_cpu_mem_usage = True,   # 是否使用低CPU内存,使用 device_map 参数必须为 True
-            quantization_config = quantization_config if load_in_8bit or load_in_4bit else None,
+            quantization_config = quantization_config if config.load_in_8bit or config.load_in_4bit else None,
         )
 
-        if adapter_dir:
-            print(f"load adapter: {adapter_dir}")
+        if config.adapter_dir:
+            print(f"load adapter: {config.adapter_dir}")
             # 2种加载adapter的方式
             # 1. load adapter https://huggingface.co/docs/transformers/main/zh/peft
             # self.model.load_adapter(adapter_dir)
             # 2. https://huggingface.co/docs/peft/main/en/package_reference/peft_model#peft.PeftModel.from_pretrained
-            self.model = PeftModel.from_pretrained(self.model, adapter_dir)
+            self.model = PeftModel.from_pretrained(self.model, config.adapter_dir)
 
         self.model.eval()
 
@@ -116,38 +99,33 @@ class InferEngine:
 
         print(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
 
-    def load_lmdeploy_model(
-        self,
-        model_path: str,
-        backend: str = 'turbomind', # turbomind, pytorch
-        model_format: str = 'hf',
-        model_name: str = 'internlm2',
-        custom_model_name: str = 'internlm2_chat_1_8b',
-        system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
-    - InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室). It is designed to be helpful, honest, and harmless.
-    - InternLM (书生·浦语) can understand and communicate fluently in the language chosen by the user such as English and 中文.
-    """
-    ):
+    def load_lmdeploy_model(self, config: LmdeployConfig):
         import lmdeploy
         from lmdeploy import pipeline, PytorchEngineConfig, TurbomindEngineConfig, ChatTemplateConfig, GenerationConfig
 
         print("lmdeploy version: ", lmdeploy.__version__)
+        print(f"lmdeploy config: {config}")
 
-        assert backend in ['turbomind', 'pytorch'], f"backend must be 'turbomind' or 'pytorch', but got {backend}"
-        assert model_format in ['hf', 'llama', 'awq'], f"model_format must be 'hf' or 'llama' or 'awq', but got {model_format}"
+        assert config.backend in ['turbomind', 'pytorch'], \
+            f"backend must be 'turbomind' or 'pytorch', but got {config.backend}"
+        assert config.model_format in ['hf', 'llama', 'awq'], \
+            f"model_format must be 'hf' or 'llama' or 'awq', but got {config.model_format}"
+        assert config.cache_max_entry_count >= 0 and config.cache_max_entry_count <= 1.0, \
+            f"cache_max_entry_count must be >= 0 and <= 1.0, but got {config.cache_max_entry_count}"
+        assert config.quant_policy in [0, 4, 8], f"quant_policy must be 0, 4 or 8, but got {config.quant_policy}"
 
-        if backend == 'turbomind':
+        if config.backend == 'turbomind':
             # 可以直接使用transformers的模型,会自动转换格式
             # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#turbomindengineconfig
             backend_config = TurbomindEngineConfig(
-                model_name = model_name,
-                model_format = model_format, # The format of input model. `hf` meaning `hf_llama`, `llama` meaning `meta_llama`, `awq` meaning the quantized model by awq. Default: None. Type: str
+                model_name = config.model_name,
+                model_format = config.model_format, # The format of input model. `hf` meaning `hf_llama`, `llama` meaning `meta_llama`, `awq` meaning the quantized model by awq. Default: None. Type: str
                 tp = 1,
                 session_len = 8192,
                 max_batch_size = 128,
-                cache_max_entry_count = 0.75,    # 调整KV Cache的占用比例为0.75
+                cache_max_entry_count = config.cache_max_entry_count,  # 调整 KV Cache的 占用比例为0.8
                 cache_block_seq_len = 64,
-                quant_policy = 0,               # 4 表示 kv int4 量化, 8 表示 kv int8 量化
+                quant_policy = config.quant_policy,                    # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
                 rope_scaling_factor = 0.0,
                 use_logn_attn = False,
                 download_dir = None,
@@ -157,11 +135,11 @@ class InferEngine:
         else:
             # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#pytorchengineconfig
             backend_config = PytorchEngineConfig(
-                model_name = model_name,
+                model_name = config.model_name,
                 tp = 1,
                 session_len = 8192,
                 max_batch_size = 128,
-                cache_max_entry_count = 0.8, # 调整KV Cache的占用比例为0.8
+                cache_max_entry_count = config.cache_max_entry_count,  # 调整 KV Cache的 占用比例为0.8
                 eviction_type = 'recompute',
                 prefill_interval = 16,
                 block_size = 64,
@@ -176,17 +154,17 @@ class InferEngine:
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/_modules/lmdeploy/model.html#ChatTemplateConfig
         chat_template_config = ChatTemplateConfig(
-            model_name = model_name,
+            model_name = config.model_name,
             system = None,
-            meta_instruction = system_prompt,
+            meta_instruction = config.system_prompt,
         )
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py
         self.pipe = pipeline(
-            model_path = model_path,
-            model_name = custom_model_name,
+            model_path = config.model_path,
+            model_name = config.custom_model_name,
             backend_config = backend_config,
             chat_template_config = chat_template_config,
         )
