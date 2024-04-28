@@ -31,7 +31,7 @@ def get_filename(path: str):
 
 def format_references(references: list[str]) -> str:
     if len(references) == 0:
-        return "\nno reference."
+        return "\n*no reference.*"
     else:
         references = [f"*{reference}*" for reference in references]
         references_str = ", ".join(references)

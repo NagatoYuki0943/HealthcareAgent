@@ -71,28 +71,20 @@ MODEL_PATH = './models/internlm2-chat-7b'
 os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b {MODEL_PATH}')
 os.system(f'cd {MODEL_PATH} && git lfs pull')
 
-SYSTEM_PROMPT = """你现在是一名医生，具备丰富的医学知识和临床经验。你擅长诊断和治疗各种疾病，能为病人提供专业的医疗建议。你有良好的沟通技巧，能与病人和他们的家人建立信任关系。请在这个角色下为我解答以下问题。
-You are now a doctor with extensive medical knowledge and clinical experience. You are adept at diagnosing and treating various diseases and can provide professional medical advice to patients. You have good communication skills and can establish a trust relationship with patients and their families. Please answer the following questions for me in this role.
+SYSTEM_PROMPT = """
+你是一名医疗知识助手，名字叫做”智疗“。
+    - ”智疗“可以根据自己丰富的医疗知识来回答问题。。
+    - ”智疗“的回答应该是有益的、诚实的和无害的。
+    - ”智疗“可以使用用户选择的语言（如英语和中文）进行理解和交流。
 """
 
-REJECT_ANSWER_ZH = "对不起，我无法回答您的问题。如果您有其他问题，欢迎随时向我提问，我会在我能力范围内尽力为您解答。"
-REJECT_ANSWER_EN = "Sorry, I can't answer your question. If you have any other questions, please feel free to ask me questions and I will try my best to answer them for you."
-
-TEMPLATE_ZH = """请使用以下提供的上下文来回答用户的问题。如果无法从上下文中得到答案，请回答你不知道。
-提供的上下文:
-···
+TEMPLATE = """上下文:
+<context>
 {context}
-···
-用户的问题: {question}
-请你使用中文回答:"""
-
-TEMPLATE_EN = """Please use the context provided below to answer the user's question. If you can't get the answer from the context, answer you don't know.
-context provided:
-···
-{context}
-···
-user's question: {question}
-please answer in English:"""
+</context>
+问题:
+<question>{question}</question>
+请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的建议(除非用户指定了回答的语言，否则用户使用什么语言就什么语言回答):"""
 
 LMDEPLOY_CONFIG = LmdeployConfig(
     model_path = MODEL_PATH,
@@ -119,7 +111,6 @@ def chat(
     top_p: float = 0.8,
     top_k: int = 40,
     temperature: float = 0.8,
-    language: str = "ZH",
     regenerate: bool = False
 ) -> Generator[Any, Any, Any]:
     # 重新生成时要把最后的query和response弹出,重用query
@@ -136,20 +127,12 @@ def chat(
             yield history
             return
 
-    # 选择语言
-    reject_answer = REJECT_ANSWER_ZH if language == "ZH" else REJECT_ANSWER_EN
-    template = TEMPLATE_ZH if language == "ZH" else TEMPLATE_EN
-
     # similarity search
     documents_str, references_str = vector_database.similarity_search(
         query = query,
     )
-    # 没有找到相关文档,返回拒绝问题
-    if documents_str == "":
-        yield history + [[query, reject_answer]]
-        print(f"\033[0;32;40mhistory: {history + [[query, reject_answer]]}\033[0m")
-        return
-    prompt = template.format(context = documents_str, question = query)
+
+    prompt = TEMPLATE.format(context = documents_str, question = query) if documents_str else query
     print(f"\033[0;34;40mprompt:\n{prompt}\033[0m")
 
     print(f"\033[0;33;40mquery: {query}; \nresponse: \033[0m", end="", flush=True)
@@ -203,8 +186,6 @@ def main():
                     submit = gr.Button("💬 Chat", variant="primary", scale=0)
 
                 with gr.Row():
-                    # 下拉框
-                    language = gr.Dropdown(choices=[("中文", "ZH"), ("English", "EN")], value="ZH", label="Language", type="value", interactive=True)
                     # 创建一个重新生成按钮，用于重新生成当前对话内容。
                     regen = gr.Button("🔄 Retry", variant="secondary")
                     undo = gr.Button("↩️ Undo", variant="secondary")
@@ -246,7 +227,7 @@ def main():
             # 回车提交
             query.submit(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature],
                 outputs=[chatbot]
             )
 
@@ -260,7 +241,7 @@ def main():
             # 按钮提交
             submit.click(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature],
                 outputs=[chatbot]
             )
 
@@ -274,7 +255,7 @@ def main():
             # 重新生成
             regen.click(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, language, regen],
+                inputs=[query, chatbot, max_new_tokens, top_p, top_k, temperature, regen],
                 outputs=[chatbot]
             )
 
