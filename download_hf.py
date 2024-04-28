@@ -4,6 +4,7 @@ from huggingface_hub import hf_hub_download, snapshot_download
 
 endpoint = "https://hf-mirror.com"
 proxies = {"https": "http://localhost:7897"}
+# 下载 bce 模型需要在 huggingface 网站同意协议,然后创建 token,将 token 替换为自己的就可以下载
 hf_token = ""
 
 
