@@ -44,7 +44,7 @@ class VectorDatabase:
         # 加载开源词向量模型
         self.embeddings = HuggingFaceEmbeddings(
             model_name = embedding_model_path,
-            # model_kwargs = {'device': 'cuda'},
+            model_kwargs = {'device': 'cuda'},
             encode_kwargs = {
                 'normalize_embeddings': True
             }
@@ -191,7 +191,7 @@ class VectorDatabase:
         reranker = BCERerank(
             top_n = self.similarity_top_k,
             model = self.reranker_model_path,
-            # device = 'cuda',
+            device = 'cuda',
             use_fp16 = True
         )
 
