@@ -144,7 +144,7 @@ def main():
         with gr.Row():
             with gr.Column(scale=4):
                 # 创建聊天框
-                chatbot = gr.Chatbot(height=500, show_copy_button=True)
+                chatbot = gr.Chatbot(height=500, show_copy_button=True, placeholder="内容由 AI 大模型生成，不构成专业医疗意见或诊断。")
 
                 with gr.Row():
                     # 创建一个文本框组件，用于输入 prompt。
@@ -235,10 +235,9 @@ def main():
                 outputs=[query, chatbot]
             )
 
-        # gr.Markdown("""提醒：<br>
-        # 1. 每次对话都会使用 RAG 进行检索。<br>
-        # 2. 源码地址：https://github.com/NagatoYuki0943/HealthcareAgent
-        # """)
+        gr.Markdown("""
+        ### 内容由 AI 大模型生成，不构成专业医疗意见或诊断。
+        """)
 
     # threads to consume the request
     gr.close_all()
