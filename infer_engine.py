@@ -19,8 +19,8 @@ class LmdeployConfig:
     model_path: str
     backend: str = 'turbomind' # turbomind, pytorch
     model_format: str = 'hf'
-    cache_max_entry_count: float = 0.8, # 调整 KV Cache 的占用比例为0.8
-    quant_policy: int = 0,              # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
+    cache_max_entry_count: float = 0.8  # 调整 KV Cache 的占用比例为0.8
+    quant_policy: int = 0               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     model_name: str = 'internlm2'
     custom_model_name: str = 'internlm2_chat_1_8b'
     system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
