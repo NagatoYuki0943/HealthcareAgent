@@ -1,4 +1,5 @@
 import os
+from langchain_core.documents import Document
 
 
 def is_used_rag(
@@ -29,12 +30,16 @@ def get_filename(path: str):
     return filename
 
 
+def format_documents(documents: list[Document]) -> str:
+    return "\n".join([doc.page_content for doc in documents])
+
+
 def format_references(references: list[str]) -> str:
     if len(references) == 0:
         return "\n*no reference.*"
     else:
         references = [f"*{reference}*" for reference in references]
-        references_str = ", ".join(references)
+        references_str = "\n".join(references)
         return f"\nreferences: \n{references_str}"
 
 

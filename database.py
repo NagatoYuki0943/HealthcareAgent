@@ -9,7 +9,7 @@ from langchain_core.vectorstores import VectorStoreRetriever
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 import os
-from utils import get_filename, format_references
+from utils import get_filename, format_documents, format_references
 
 
 class VectorDatabase:
@@ -209,7 +209,7 @@ class VectorDatabase:
 
         # similarity search
         documents = self.retriever.get_relevant_documents(query)
-        documents_str = "\n".join([doc.page_content for doc in documents])
+        documents_str = format_documents(documents)
         # 获取参考文档并去重
         references = list(set([get_filename(doc.metadata['source']) for doc in documents]))
         references_str = format_references(references)
