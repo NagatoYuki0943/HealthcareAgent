@@ -302,7 +302,12 @@ class InferEngine:
 
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
-        response = self.pipe(prompts=prompts, gen_config=self.gen_config).text
+        response = self.pipe(
+            prompts = prompts,
+            gen_config = self.gen_config,
+            do_preprocess = True,
+            adapter_name = None
+        ).text
         history.append([query, response])
         return response, history
 
