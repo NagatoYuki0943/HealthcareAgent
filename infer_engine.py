@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Generator, Any
+from loguru import logger
 
 
 @dataclass
@@ -45,11 +46,11 @@ class InferEngine:
         if backend == 'transformers':
             assert transformers_config is not None, "transformers_config must not be None when backend is 'transformers'"
             self.load_transformers_model(transformers_config)
-            print("transformers model loaded")
+            logger.info("transformers model loaded")
         elif backend == 'lmdeploy':
             assert lmdeploy_config is not None, "lmdeploy_config must not be None when backend is 'lmdeploy'"
             self.load_lmdeploy_model(lmdeploy_config)
-            print("lmdeploy model loaded")
+            logger.info("lmdeploy model loaded")
 
     def load_transformers_model(self, config: TransformersConfig):
         import torch
@@ -57,9 +58,9 @@ class InferEngine:
         from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
         from peft import PeftModel
 
-        print("torch version: ", torch.__version__)
-        print("transformers version: ", transformers.__version__)
-        print(f"transformers config: {config}")
+        logger.info(f"torch version: {torch.__version__}")
+        logger.info(f"transformers version: {transformers.__version__}")
+        logger.info(f"transformers config: {config}")
 
         # tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
@@ -86,7 +87,7 @@ class InferEngine:
         )
 
         if config.adapter_path:
-            print(f"load adapter: {config.adapter_path}")
+            logger.info(f"load adapter: {config.adapter_path}")
             # 2种加载adapter的方式
             # 1. load adapter https://huggingface.co/docs/transformers/main/zh/peft
             # self.model.load_adapter(adapter_path)
@@ -95,16 +96,16 @@ class InferEngine:
 
         self.model.eval()
 
-        # print(model.__class__.__name__) # InternLM2ForCausalLM
+        # logger.info(model.__class__.__name__) # InternLM2ForCausalLM
 
-        print(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
+        logger.info(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
 
     def load_lmdeploy_model(self, config: LmdeployConfig):
         import lmdeploy
         from lmdeploy import pipeline, PytorchEngineConfig, TurbomindEngineConfig, ChatTemplateConfig, GenerationConfig
 
-        print("lmdeploy version: ", lmdeploy.__version__)
-        print(f"lmdeploy config: {config}")
+        logger.info(f"lmdeploy version: {lmdeploy.__version__}")
+        logger.info(f"lmdeploy config: {config}")
 
         assert config.backend in ['turbomind', 'pytorch'], \
             f"backend must be 'turbomind' or 'pytorch', but got {config.backend}"
@@ -197,13 +198,14 @@ class InferEngine:
     ) -> tuple[str, list]:
         history = [] if history is None else history
 
-        print({
+        logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,
-        })
+        }))
 
+        logger.info(f"query: {query}")
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
         # chat 调用的 generate
         response, history = self.model.chat(
@@ -218,6 +220,8 @@ class InferEngine:
             top_k = top_k,
             meta_instruction = self.transformers_config.system_prompt,
         )
+        logger.info(f"response: {response}")
+        logger.info(f"history: {history}")
         return response, history
 
     def convert_history(
@@ -302,8 +306,9 @@ class InferEngine:
         self.gen_config.top_p = top_p
         self.gen_config.top_k = top_k
         self.gen_config.temperature = temperature
-        print("gen_config: ", self.gen_config)
+        logger.info(f"gen_config: {self.gen_config}")
 
+        logger.info(f"query: {query}")
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
         response = self.pipe(
@@ -311,9 +316,11 @@ class InferEngine:
             gen_config = self.gen_config,
             do_preprocess = True,
             adapter_name = None
-        ).text
-        history.append([query, response])
-        return response, history
+        )
+        history.append([query, response].text)
+        logger.info(f"response: {response}")
+        logger.info(f"history: {history}")
+        return response.text, history
 
     def chat(
         self,
@@ -373,13 +380,14 @@ class InferEngine:
     ) -> Generator[Any, Any, Any]:
         history = [] if history is None else history
 
-        print({
+        logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,
-        })
+        }))
 
+        logger.info(f"query: {query}")
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
         # stream_chat 返回的句子长度是逐渐边长的,length的作用是记录之前的输出长度,用来截断之前的输出
         for response, history in self.model.stream_chat(
@@ -393,8 +401,10 @@ class InferEngine:
                 top_k = top_k,
                 meta_instruction = self.transformers_config.system_prompt,
             ):
+            logger.info(f"response: {response}")
             if response is not None:
                 yield response, history
+        logger.info(f"history: {history}")
 
     def lmdeploy_chat_stream(
         self,
@@ -416,8 +426,9 @@ class InferEngine:
         self.gen_config.top_p = top_p
         self.gen_config.top_k = top_k
         self.gen_config.temperature = temperature
-        print("gen_config: ", self.gen_config)
+        logger.info(f"gen_config: {self.gen_config}")
 
+        logger.info(f"query: {query}")
         response = ""
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
@@ -427,12 +438,14 @@ class InferEngine:
             do_preprocess = True,
             adapter_name = None
         ):
-            # print(_response)
+            logger.info(_response)
             # Response(text='很高兴', generate_token_len=10, input_token_len=111, session_id=0, finish_reason=None)
             # Response(text='认识', generate_token_len=11, input_token_len=111, session_id=0, finish_reason=None)
             # Response(text='你', generate_token_len=12, input_token_len=111, session_id=0, finish_reason=None)
             response += _response.text
             yield response, history + [[query, response]]
+        logger.info(f"response: {response}")
+        logger.info(f"history: {history}")
 
     def chat_stream(
         self,

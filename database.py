@@ -9,6 +9,7 @@ from langchain_core.vectorstores import VectorStoreRetriever
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 import os
+from loguru import logger
 from utils import get_filename, format_documents, format_references
 
 
@@ -109,13 +110,13 @@ class VectorDatabase:
         """
         if os.path.exists(self.persist_directory):
             if not force:
-                print(f"`{self.persist_directory}` 路径已存在, 无需创建数据库, 直接读取数据库即可, 如果想强制重新传建, 请设置参数 `force = True`")
+                logger.warning(f"`{self.persist_directory}` 路径已存在, 无需创建数据库, 直接读取数据库即可, 如果想强制重新传建, 请设置参数 `force = True`")
                 self.load_faiss_vectordb()
                 return
             else:
                 from shutil import rmtree
                 rmtree(self.persist_directory)
-                print(f"\033[0;31;40m`{self.persist_directory}` 路径已删除,即将重新创建数据库\033[0m")
+                logger.warning(f"\033[0;31;40m`{self.persist_directory}` 路径已删除,即将重新创建数据库\033[0m")
 
         from langchain_community.vectorstores import FAISS
 
@@ -222,12 +223,12 @@ if __name__ == "__main__":
     vector_database.load_faiss_vectordb()
     vector_database.create_faiss_retriever()
     documents_str, references_str = vector_database.similarity_search("Eye Pressure Lowering Effect of Vitamin C")
-    print(f"\033[0;31;40m{references_str}\033[0m")
+    logger.info(f"references_str: {references_str}")
     documents_str, references_str = vector_database.similarity_search("吃了吗")
-    print(f"\033[0;31;40m{references_str}\033[0m")
-    print("#" * 100)
+    logger.info(f"references_str: {references_str}")
+
     vector_database.create_faiss_reranker_retriever()
     documents_str, references_str = vector_database.similarity_search("Eye Pressure Lowering Effect of Vitamin C")
-    print(f"\033[0;31;40m{references_str}\033[0m")
+    logger.info(f"references_str: {references_str}")
     documents_str, references_str = vector_database.similarity_search("吃了吗")
-    print(f"\033[0;31;40m{references_str}\033[0m")
+    logger.info(f"references_str: {references_str}")

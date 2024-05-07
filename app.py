@@ -11,14 +11,16 @@ import gradio as gr
 from typing import Generator, Any
 from utils import download_dataset
 from huggingface_hub import hf_hub_download, snapshot_download
+from loguru import logger
+from utils import remove_history_references
+
+
+logger.info(f"gradio version: {gr.__version__}")
 
 
 print("*" * 100)
 os.system("pip list")
 print("*" * 100)
-
-
-print("gradio version: ", gr.__version__)
 
 
 DATA_PATH = "./data"
@@ -114,36 +116,40 @@ def chat(
 ) -> Generator[Any, Any, Any]:
     history = [] if history is None else history
 
+    # 是否是有效的问题
     query = query.strip()
     if query == None or len(query) < 1:
         yield history
         return
+    logger.info(f"query: {query}")
 
-    # similarity search
+    # 数据库检索
     documents_str, references_str = vector_database.similarity_search(
         query = query,
     )
 
+    # 格式化rag文件
     prompt = TEMPLATE.format(context = documents_str, question = query) if documents_str else query
-    print(f"\033[0;34;40mprompt:\n{prompt}\033[0m")
+    logger.info(f"prompt: {prompt}")
 
-    print(f"\033[0;33;40mquery: {query}; \nresponse: \033[0m", end="", flush=True)
-    length = 0
+    # 给模型的历史记录去除参考文档
+    history_without_reference = remove_history_references(history = history)
+    logger.info(f"history_without_reference: {history_without_reference}")
+
     for response, _history in infer_engine.chat_stream(
         query = prompt,
-        history = history,
+        history = history_without_reference,
         max_new_tokens = max_new_tokens,
         temperature = temperature,
         top_p = top_p,
         top_k = top_k,
     ):
-        print(f"\033[0;33;40m{response[length:]}\033[0m", flush=True, end="")
-        length = len(response)
         yield history + [[query, response]]
+
     # 加上参考文档
     yield history + [[query, response + references_str]]
-    print(f"\033[0;36;40m{references_str}\033[0m")
-    print(f"\033[0;32;40mhistory: {history + [[query, response + references_str]]}\033[0m")
+    logger.info(f"references_str: {references_str}")
+    logger.info(f"history_without_rag: {history + [[query, response + references_str]]}")
 
 
 def regenerate(
