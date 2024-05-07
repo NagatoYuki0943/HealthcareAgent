@@ -1,10 +1,11 @@
 import os
+import re
 from langchain_core.documents import Document
 
 
 def is_used_rag(
     reject_answer: str,
-    history: list = [],
+    history: list,
 ) -> bool:
     """是否使用过rag"""
     if len(history) == 0:
@@ -41,6 +42,15 @@ def format_references(references: list[str]) -> str:
         references = [f"*{reference}*" for reference in references]
         references_str = "\n".join(references)
         return f"\nreferences: \n{references_str}"
+
+
+def remove_history_references(history: list) -> list:
+    new_history = []
+    for prompt, response in history:
+        # 按照参考说明拆分,只保留拆分前的内容
+        response_no_reference = re.split(r"\n\*no reference\.\*|\nreferences:", response)[0]
+        new_history.append([prompt, response_no_reference])
+    return new_history
 
 
 def download_dataset(
