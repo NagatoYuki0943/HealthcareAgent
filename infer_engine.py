@@ -188,18 +188,20 @@ class InferEngine:
     def transformers_chat(
         self,
         query: str,
-        history: list = [],  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
+        temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
-        temperature: float = 0.8,
         **kwargs,
     ) -> tuple[str, list]:
+        history = [] if history is None else history
+
         print({
             "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,
-            "temperature": temperature,
         })
 
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
@@ -283,13 +285,15 @@ class InferEngine:
     def lmdeploy_chat(
         self,
         query: str,
-        history: list = [],  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
+        temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
-        temperature: float = 0.8,
         **kwargs,
     ) -> tuple[str, list]:
+        history = [] if history is None else history
+
         # 将历史记录转换为openai格式
         prompts = self.convert_history(query, history)
 
@@ -314,11 +318,11 @@ class InferEngine:
     def chat(
         self,
         query: str,
-        history: list = [],  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
+        temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
-        temperature: float = 0.8,
         **kwargs,
     ) -> tuple[str, list]:
         """对话
@@ -328,34 +332,52 @@ class InferEngine:
             history (list, optional): 对话历史. Defaults to [].
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
+            temperature (float, optional): temperature. Defaults to 0.8.
             top_p (float, optional): top_p. Defaults to 0.8.
             top_k (int, optional): top_k. Defaults to 40.
-            temperature (float, optional): temperature. Defaults to 0.8.
 
         Returns:
             tuple[str, list]: 回答和历史记录
         """
 
         if self.backend == 'transformers':
-            return self.transformers_chat(query, history, max_new_tokens, top_p, top_k, temperature, **kwargs)
+            return self.transformers_chat(
+                query = query,
+                history = history,
+                max_new_tokens = max_new_tokens,
+                temperature = temperature,
+                top_p = top_p,
+                top_k = top_k,
+                **kwargs
+            )
         elif self.backend == 'lmdeploy':
-            return self.lmdeploy_chat(query, history, max_new_tokens, top_p, top_k, temperature, **kwargs)
+            return self.lmdeploy_chat(
+                query = query,
+                history = history,
+                max_new_tokens = max_new_tokens,
+                temperature = temperature,
+                top_p = top_p,
+                top_k = top_k,
+                **kwargs
+            )
 
     def transformers_chat_stream(
         self,
         query: str,
-        history: list = [],  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
+        temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
-        temperature: float = 0.8,
         **kwargs,
     ) -> Generator[Any, Any, Any]:
+        history = [] if history is None else history
+
         print({
             "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
             "top_p": top_p,
             "top_k": top_k,
-            "temperature": temperature,
         })
 
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
@@ -377,12 +399,15 @@ class InferEngine:
     def lmdeploy_chat_stream(
         self,
         query: str,
-        history: list = [],  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
+        temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
-        temperature: float = 0.8,
+        **kwargs,
     ) -> Generator[Any, Any, Any]:
+        history = [] if history is None else history
+
         # 将历史记录转换为openai格式
         prompts = self.convert_history(query, history)
 
@@ -412,11 +437,11 @@ class InferEngine:
     def chat_stream(
         self,
         query: str,
-        history: list = [],
+        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
+        temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
-        temperature: float = 0.8,
         **kwargs,
     ) -> Generator[Any, Any, Any]:
         """流式返回对话
@@ -426,14 +451,30 @@ class InferEngine:
             history (list, optional): 对话历史. Defaults to [].
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
+            temperature (float, optional): temperature. Defaults to 0.8.
             top_p (float, optional): top_p. Defaults to 0.8.
             top_k (int, optional): top_k. Defaults to 40.
-            temperature (float, optional): temperature. Defaults to 0.8.
 
         Yields:
             Generator[Any, Any, Any]: 回答和历史记录
         """
         if self.backend == 'transformers':
-            return self.transformers_chat_stream(query, history, max_new_tokens, top_p, top_k, temperature, **kwargs)
+            return self.transformers_chat_stream(
+                query = query,
+                history = history,
+                max_new_tokens = max_new_tokens,
+                temperature = temperature,
+                top_p = top_p,
+                top_k = top_k,
+                **kwargs
+            )
         elif self.backend == 'lmdeploy':
-            return self.lmdeploy_chat_stream(query, history, max_new_tokens, top_p, top_k, temperature, **kwargs)
+            return self.lmdeploy_chat_stream(
+                query = query,
+                history = history,
+                max_new_tokens = max_new_tokens,
+                temperature = temperature,
+                top_p = top_p,
+                top_k = top_k,
+                **kwargs
+            )
