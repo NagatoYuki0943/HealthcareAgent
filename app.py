@@ -221,7 +221,7 @@ def main():
                         )
                         temperature = gr.Slider(
                             minimum=0.01,
-                            maximum=1.5,
+                            maximum=2,
                             value=0.8,
                             step=0.01,
                             label='Temperature'
