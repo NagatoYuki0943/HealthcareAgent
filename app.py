@@ -62,7 +62,7 @@ vector_database = VectorDatabase(
     allow_suffix = ALLOW_SUFFIX
 )
 # 创建数据库
-vector_database.create_faiss_vectordb()
+vector_database.create_faiss_vectordb(force=True)
 # 载入数据库(创建数据库后不需要载入也可以)
 vector_database.load_faiss_vectordb()
 # 创建重排序 retriever
@@ -86,7 +86,7 @@ TEMPLATE = """上下文:
 </context>
 问题:
 <question>{question}</question>
-请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的建议(除非用户指定了回答的语言，否则用户使用什么语言就什么语言回答):"""
+请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理(除非用户指定了回答的语言，否则用户使用什么语言就用什么语言回答):"""
 
 LMDEPLOY_CONFIG = LmdeployConfig(
     model_path = MODEL_PATH,

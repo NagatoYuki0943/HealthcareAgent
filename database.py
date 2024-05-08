@@ -219,7 +219,7 @@ class VectorDatabase:
 
 if __name__ == "__main__":
     vector_database = VectorDatabase()
-    vector_database.create_faiss_vectordb()
+    vector_database.create_faiss_vectordb(force=True)
     vector_database.load_faiss_vectordb()
     vector_database.create_faiss_retriever()
     documents_str, references_str = vector_database.similarity_search("Eye Pressure Lowering Effect of Vitamin C")
