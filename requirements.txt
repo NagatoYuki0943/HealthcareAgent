@@ -17,5 +17,5 @@ pypdf
 unstructured # txt,md,doc,docx
 python-docx # doc,docx
 lmdeploy
-openxlab
+openxlab>=0.0.38
 loguru
