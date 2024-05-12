@@ -297,14 +297,14 @@ def main():
     # threads to consume the request
     gr.close_all()
 
-    # 设置队列启动，队列最大长度为 100
-    demo.queue(max_size=100)
+    # 设置队列启动
+    demo.queue(
+        max_size=None,                  # If None, the queue size will be unlimited.
+        default_concurrency_limit=100   # 最大并发限制
+    )
 
-    # 启动新的 Gradio 应用，设置分享功能为 True，并使用环境变量 PORT1 指定服务器端口。
-    # demo.launch(share=True, server_port=int(os.environ['PORT1']))
-    # 直接启动
-    # demo.launch(server_name="127.0.0.1", server_port=7860)
-    demo.launch()
+    # demo.launch(server_name = "127.0.0.1", server_port = 7860, share = True, max_threads=100)
+    demo.launch(max_threads=100)
 
 
 if __name__ == "__main__":
