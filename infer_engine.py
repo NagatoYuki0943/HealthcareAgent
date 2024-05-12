@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Generator, Any
+from typing import Generator, Literal, Sequence, Any
 from loguru import logger
 
 
@@ -18,8 +18,8 @@ class TransformersConfig:
 @dataclass
 class LmdeployConfig:
     model_path: str
-    backend: str = 'turbomind' # turbomind, pytorch
-    model_format: str = 'hf'
+    backend: Literal['turbomind', 'pytorch'] = 'turbomind'
+    model_format: Literal['hf', 'llama', 'awq'] = 'hf'
     cache_max_entry_count: float = 0.8  # 调整 KV Cache 的占用比例为0.8
     quant_policy: int = 0               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     model_name: str = 'internlm2'
@@ -33,7 +33,7 @@ class LmdeployConfig:
 class InferEngine:
     def __init__(
         self,
-        backend = 'transformers', # transformers, lmdeploy
+        backend = Literal['transformers', 'lmdeploy'], # transformers, lmdeploy
         transformers_config: TransformersConfig = None,
         lmdeploy_config: LmdeployConfig = None,
     ) -> None:
@@ -52,7 +52,7 @@ class InferEngine:
             self.load_lmdeploy_model(lmdeploy_config)
             logger.info("lmdeploy model loaded")
 
-    def load_transformers_model(self, config: TransformersConfig):
+    def load_transformers_model(self, config: TransformersConfig) -> None:
         import torch
         import transformers
         from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
@@ -100,7 +100,7 @@ class InferEngine:
 
         logger.info(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
 
-    def load_lmdeploy_model(self, config: LmdeployConfig):
+    def load_lmdeploy_model(self, config: LmdeployConfig) -> None:
         import lmdeploy
         from lmdeploy import pipeline, PytorchEngineConfig, TurbomindEngineConfig, ChatTemplateConfig, GenerationConfig
 
@@ -186,18 +186,16 @@ class InferEngine:
             skip_special_tokens = True,
         )
 
-    def transformers_chat(
+    def __transformers_chat(
         self,
         query: str,
-        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
         **kwargs,
-    ) -> tuple[str, list]:
-        history = [] if history is None else history
-
+    ) -> tuple[str, Sequence]:
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -227,7 +225,7 @@ class InferEngine:
     def convert_history(
         self,
         query: str,
-        history: list
+        history: Sequence
     ) -> list:
         """
         将历史记录转换为openai格式
@@ -286,18 +284,16 @@ class InferEngine:
         )
         return prompts
 
-    def lmdeploy_chat(
+    def __lmdeploy_chat(
         self,
         query: str,
-        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
         **kwargs,
-    ) -> tuple[str, list]:
-        history = [] if history is None else history
-
+    ) -> tuple[str, Sequence]:
         # 将历史记录转换为openai格式
         prompts = self.convert_history(query, history)
 
@@ -317,7 +313,7 @@ class InferEngine:
             do_preprocess = True,
             adapter_name = None
         )
-        history.append([query, response].text)
+        history.append([query, response.text])
         logger.info(f"response: {response}")
         logger.info(f"history: {history}")
         return response.text, history
@@ -325,18 +321,18 @@ class InferEngine:
     def chat(
         self,
         query: str,
-        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
         **kwargs,
-    ) -> tuple[str, list]:
+    ) -> tuple[str, Sequence]:
         """对话
 
         Args:
             query (str): 问题
-            history (list, optional): 对话历史. Defaults to [].
+            history (Sequence, optional): 对话历史. Defaults to [].
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
             temperature (float, optional): temperature. Defaults to 0.8.
@@ -344,11 +340,12 @@ class InferEngine:
             top_k (int, optional): top_k. Defaults to 40.
 
         Returns:
-            tuple[str, list]: 回答和历史记录
+            tuple[str, Sequence]: 回答和历史记录
         """
+        history = [] if history is None else list(history)
 
         if self.backend == 'transformers':
-            return self.transformers_chat(
+            return self.__transformers_chat(
                 query = query,
                 history = history,
                 max_new_tokens = max_new_tokens,
@@ -358,7 +355,7 @@ class InferEngine:
                 **kwargs
             )
         elif self.backend == 'lmdeploy':
-            return self.lmdeploy_chat(
+            return self.__lmdeploy_chat(
                 query = query,
                 history = history,
                 max_new_tokens = max_new_tokens,
@@ -368,18 +365,16 @@ class InferEngine:
                 **kwargs
             )
 
-    def transformers_chat_stream(
+    def __transformers_chat_stream(
         self,
         query: str,
-        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
         **kwargs,
-    ) -> Generator[Any, Any, Any]:
-        history = [] if history is None else history
-
+    ) -> Generator[tuple[str, Sequence], None, None]:
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -406,18 +401,16 @@ class InferEngine:
                 yield response, history
         logger.info(f"history: {history}")
 
-    def lmdeploy_chat_stream(
+    def __lmdeploy_chat_stream(
         self,
         query: str,
-        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
         **kwargs,
-    ) -> Generator[Any, Any, Any]:
-        history = [] if history is None else history
-
+    ) -> Generator[tuple[str, Sequence], None, None]:
         # 将历史记录转换为openai格式
         prompts = self.convert_history(query, history)
 
@@ -450,18 +443,18 @@ class InferEngine:
     def chat_stream(
         self,
         query: str,
-        history: list | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
         **kwargs,
-    ) -> Generator[Any, Any, Any]:
+    ) -> Generator[tuple[str, Sequence], None, None]:
         """流式返回对话
 
         Args:
             query (str): 问题
-            history (list, optional): 对话历史. Defaults to [].
+            history (Sequence, optional): 对话历史. Defaults to [].
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
             temperature (float, optional): temperature. Defaults to 0.8.
@@ -469,10 +462,12 @@ class InferEngine:
             top_k (int, optional): top_k. Defaults to 40.
 
         Yields:
-            Generator[Any, Any, Any]: 回答和历史记录
+            Generator[tuple[str, Sequence], None, None]: 回答和历史记录
         """
+        history = [] if history is None else list(history)
+
         if self.backend == 'transformers':
-            return self.transformers_chat_stream(
+            return self.__transformers_chat_stream(
                 query = query,
                 history = history,
                 max_new_tokens = max_new_tokens,
@@ -482,7 +477,7 @@ class InferEngine:
                 **kwargs
             )
         elif self.backend == 'lmdeploy':
-            return self.lmdeploy_chat_stream(
+            return self.__lmdeploy_chat_stream(
                 query = query,
                 history = history,
                 max_new_tokens = max_new_tokens,
