@@ -201,13 +201,29 @@ def main():
                 # 创建聊天框
                 chatbot = gr.Chatbot(height=500, show_copy_button=True, placeholder="内容由 AI 大模型生成，不构成专业医疗意见或诊断。")
 
-                with gr.Row():
-                    # 创建一个文本框组件，用于输入 prompt。
-                    query = gr.Textbox(label="Prompt/问题", placeholder="Enter 发送; Shift + Enter 换行 / Enter to send; Shift + Enter to wrap")
-                    # 创建提交按钮。
-                    # variant https://www.gradio.app/docs/button
-                    # scale https://www.gradio.app/guides/controlling-layout
-                    submit = gr.Button("💬 Chat", variant="primary", scale=0)
+                # 组内的组件没有间距
+                with gr.Group():
+                    with gr.Row():
+                        # 创建一个文本框组件，用于输入 prompt。
+                        query = gr.Textbox(
+                            lines=1,
+                            label="Prompt / 问题",
+                            placeholder="Enter 发送; Shift + Enter 换行 / Enter to send; Shift + Enter to wrap"
+                        )
+                        # 创建提交按钮。
+                        # variant https://www.gradio.app/docs/button
+                        # scale https://www.gradio.app/guides/controlling-layout
+                        submit = gr.Button("💬 Chat", variant="primary", scale=0)
+
+                gr.Examples(
+                    examples=[
+                        ["维生素E有什么作用，请详细说明"],
+                        ["维生素C对治疗眼睛疾病有作用，请详细说明"],
+                        ["Please elaborate on the role of vitamin C in treating eye diseases"]
+                    ],
+                    inputs=[query],
+                    label="示例问题 / Example questions"
+                )
 
                 with gr.Row():
                     # 创建一个重新生成按钮，用于重新生成当前对话内容。
@@ -299,12 +315,12 @@ def main():
 
     # 设置队列启动
     demo.queue(
-        max_size=None,                  # If None, the queue size will be unlimited.
-        default_concurrency_limit=100   # 最大并发限制
+        max_size = None,                # If None, the queue size will be unlimited.
+        default_concurrency_limit = 40  # 最大并发限制
     )
 
-    # demo.launch(server_name = "127.0.0.1", server_port = 7860, share = True, max_threads=100)
-    demo.launch(max_threads=100)
+    # demo.launch(server_name = "127.0.0.1", server_port = 7860, share = True, max_threads = 40)
+    demo.launch(max_threads = 40)
 
 
 if __name__ == "__main__":
