@@ -1,5 +1,7 @@
 import os
 import re
+import uuid
+from typing import Literal
 from langchain_core.documents import Document
 
 
@@ -69,6 +71,24 @@ def download_dataset(
     openxlab.login(ak=access_key, sk=secret_key)
     get(dataset_repo=dataset_repo, target_path=target_path) # 数据集下载
     print("finish download dataset")
+
+
+def random_uuid(dtype: Literal['int', 'str', 'bytes', 'time'] = 'int') -> int | str | bytes:
+    """生成随机uuid
+    reference: https://github.com/vllm-project/vllm/blob/main/vllm/utils.py
+    """
+    assert dtype in ['int', 'str', 'bytes', 'time'], f"unsupported dtype: {dtype}, should be in ['int', 'str', 'bytes', 'time']"
+
+    # uuid4: 由伪随机数得到，有一定的重复概率，该概率可以计算出来。
+    uid = uuid.uuid4()
+    if dtype == 'int':
+        return uid.int
+    elif dtype == 'str':
+        return uid.hex
+    elif dtype == 'bytes':
+        return uid.bytes
+    else:
+        return uid.time
 
 
 if __name__ == "__main__":
