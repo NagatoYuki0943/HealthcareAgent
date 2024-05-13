@@ -58,7 +58,8 @@ TEMPLATE = """上下文:
 </context>
 问题:
 <question>{question}</question>
-请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理(除非用户指定了回答的语言，否则用户使用什么语言就用什么语言回答):"""
+请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理:"""
+# 请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理(除非用户指定了回答的语言，否则用户使用什么语言就用什么语言回答):"""
 
 TRANSFORMERS_CONFIG = TransformersConfig(
     pretrained_model_name_or_path = PRETRAINED_MODEL_NAME_OR_PATH,
