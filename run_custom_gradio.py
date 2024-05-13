@@ -184,7 +184,7 @@ def main():
                         # scale https://www.gradio.app/guides/controlling-layout
                         submit = gr.Button("💬 Chat", variant="primary", scale=0)
 
-               gr.Examples(
+                gr.Examples(
                     examples=[
                         ["维生素E有什么作用，请详细说明"],
                         ["维生素C对治疗眼睛疾病有什么作用，请详细说明"],
