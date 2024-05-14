@@ -152,6 +152,7 @@ class InferEngine:
                 download_dir = None,
                 revision = None,
             )
+        logger.info(f"lmdeploy backend_config: {backend_config}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/_modules/lmdeploy/model.html#ChatTemplateConfig
         chat_template_config = ChatTemplateConfig(
@@ -159,6 +160,7 @@ class InferEngine:
             system = None,
             meta_instruction = config.system_prompt,
         )
+        logger.info(f"lmdeploy chat_template_config: {chat_template_config}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
