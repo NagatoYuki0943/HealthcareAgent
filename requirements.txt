@@ -17,6 +17,6 @@ faiss-cpu==1.8.0
 pypdf==4.2.0
 unstructured==0.13.7 # txt,md,doc,docx
 python-docx==1.1.2 # doc,docx
-lmdeploy==0.4.1
+lmdeploy==0.4.0
 openxlab==0.0.38
 loguru==0.7.2
