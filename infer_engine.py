@@ -1,6 +1,12 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Generator, Literal, Sequence, Any
+import torch
+import transformers
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers.generation.streamers import BaseStreamer
+import queue
+import threading
 from loguru import logger
 
 
@@ -10,6 +16,7 @@ class TransformersConfig:
     adapter_path: str = None
     load_in_8bit: bool = False
     load_in_4bit: bool = False
+    model_name: str = 'internlm2'
     system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
     - InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室). It is designed to be helpful, honest, and harmless.
     - InternLM (书生·浦语) can understand and communicate fluently in the language chosen by the user such as English and 中文.
@@ -124,9 +131,6 @@ class DeployEngine(ABC):
 
 class TransfomersEngine(DeployEngine):
     def __init__(self, config: TransformersConfig) -> None:
-        import torch
-        import transformers
-        from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
         from peft import PeftModel
 
         logger.info(f"torch version: {torch.__version__}")
@@ -174,6 +178,148 @@ class TransfomersEngine(DeployEngine):
 
         logger.info(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
 
+    # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1136-L1146
+    def build_inputs(
+        self,
+        tokenizer,
+        query: str,
+        history: list[tuple[str, str]] | None = None,
+        meta_instruction = ""
+    ) -> tuple[str, Sequence]:
+        history = [] if history is None else list(history)
+
+        if tokenizer.add_bos_token:
+            prompt = ""
+        else:
+            prompt = tokenizer.bos_token
+        if meta_instruction:
+            prompt += f"""<|im_start|>system\n{meta_instruction}<|im_end|>\n"""
+        for record in history:
+            prompt += f"""<|im_start|>user\n{record[0]}<|im_end|>\n<|im_start|>assistant\n{record[1]}<|im_end|>\n"""
+        prompt += f"""<|im_start|>user\n{query}<|im_end|>\n<|im_start|>assistant\n"""
+        return prompt, tokenizer([prompt], return_tensors="pt")
+
+    # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1148-L1182
+    @torch.no_grad()
+    def __chat(
+        self,
+        tokenizer,
+        query: str,
+        history: Sequence | None = None,
+        streamer: BaseStreamer | None = None,
+        max_new_tokens: int = 1024,
+        do_sample: bool = True,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        meta_instruction: str = "You are an AI assistant whose name is InternLM (书生·浦语).\n"
+        "- InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室). It is designed to be helpful, honest, and harmless.\n"
+        "- InternLM (书生·浦语) can understand and communicate fluently in the language chosen by the user such as English and 中文.",
+        **kwargs,
+    ) -> tuple[str, Sequence]:
+        history = [] if history is None else list(history)
+        _, inputs = self.build_inputs(tokenizer, query, history, meta_instruction)
+        inputs = {k: v.to(self.model.device) for k, v in inputs.items() if torch.is_tensor(v)}
+        # also add end-of-assistant token in eos token id to avoid unnecessary generation
+        eos_token_id = [tokenizer.eos_token_id, tokenizer.convert_tokens_to_ids(["<|im_end|>"])[0]]
+        outputs = self.model.generate(
+            **inputs,
+            streamer=streamer,
+            max_new_tokens=max_new_tokens,
+            do_sample=do_sample,
+            temperature=temperature,
+            top_p=top_p,
+            eos_token_id=eos_token_id,
+            **kwargs,
+        )
+        outputs = outputs[0].cpu().tolist()[len(inputs["input_ids"][0]) :]
+        response = tokenizer.decode(outputs, skip_special_tokens=True)
+        response = response.split("<|im_end|>")[0]
+        history = history + [(query, response)]
+        return response, history
+
+    # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1184-L1268
+    @torch.no_grad()
+    def __stream_chat(
+        self,
+        tokenizer,
+        query: str,
+        history: Sequence | None = None,
+        max_new_tokens: int = 1024,
+        do_sample: bool = True,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        **kwargs,
+    ) -> Generator[tuple[str, Sequence], None, None]:
+        """
+        Return a generator in format: (response, history)
+        Eg.
+        ('你好，有什么可以帮助您的吗', [('你好', '你好，有什么可以帮助您的吗')])
+        ('你好，有什么可以帮助您的吗？', [('你好', '你好，有什么可以帮助您的吗？')])
+        """
+        history = [] if history is None else list(history)
+
+        response_queue = queue.Queue(maxsize=20)
+
+        class ChatStreamer(BaseStreamer):
+            def __init__(self, tokenizer) -> None:
+                super().__init__()
+                self.tokenizer = tokenizer
+                self.queue = response_queue
+                self.query = query
+                self.history = history
+                self.response = ""
+                self.cache = []
+                self.received_inputs = False
+                self.queue.put((self.response, history + [(self.query, self.response)]))
+
+            def put(self, value):
+                if len(value.shape) > 1 and value.shape[0] > 1:
+                    raise ValueError("ChatStreamer only supports batch size 1")
+                elif len(value.shape) > 1:
+                    value = value[0]
+
+                if not self.received_inputs:
+                    # The first received value is input_ids, ignore here
+                    self.received_inputs = True
+                    return
+
+                self.cache.extend(value.tolist())
+                token = self.tokenizer.decode(self.cache, skip_special_tokens=True)
+                if token.strip() != "<|im_end|>":
+                    self.response = self.response + token
+                    history = self.history + [(self.query, self.response)]
+                    self.queue.put((self.response, history))
+                    self.cache = []
+                else:
+                    self.end()
+
+            def end(self):
+                self.queue.put(None)
+
+        def stream_producer():
+            return self.__chat(
+                tokenizer=tokenizer,
+                query=query,
+                streamer=ChatStreamer(tokenizer=tokenizer),
+                history=history,
+                max_new_tokens=max_new_tokens,
+                do_sample=do_sample,
+                temperature=temperature,
+                top_p=top_p,
+                **kwargs,
+            )
+
+        def consumer():
+            producer = threading.Thread(target=stream_producer)
+            producer.start()
+            while True:
+                res = response_queue.get()
+                if res is None:
+                    return
+                yield res
+
+        return consumer()
+
     def chat(
         self,
         query: str,
@@ -193,8 +339,8 @@ class TransfomersEngine(DeployEngine):
 
         logger.info(f"query: {query}")
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
-        # chat 调用的 generate
-        response, history = self.model.chat(
+        # response, history = self.model.chat( # only for internlm2
+        response, history = self.__chat(
             tokenizer = self.tokenizer,
             query = query,
             history = history,
@@ -230,7 +376,8 @@ class TransfomersEngine(DeployEngine):
         logger.info(f"query: {query}")
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
         # stream_chat 返回的句子长度是逐渐边长的,length的作用是记录之前的输出长度,用来截断之前的输出
-        for response, history in self.model.stream_chat(
+        # for response, history in self.model.stream_chat( # only for internlm2
+        for response, history in self.__stream_chat(
                 tokenizer = self.tokenizer,
                 query = query,
                 history = history,
