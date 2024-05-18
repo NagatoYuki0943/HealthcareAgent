@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from abc import ABC, abstractmethod
 from typing import Generator, Literal, Sequence, Any
 from loguru import logger
 
@@ -30,29 +31,99 @@ class LmdeployConfig:
     """
 
 
-class InferEngine:
-    def __init__(
+def convert_history(
+    query: str,
+    history: Sequence
+) -> list:
+    """
+    将历史记录转换为openai格式
+
+    Args:
+        query (str): query
+        history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+
+    Returns:
+        list: prompts (List[str] | str | List[Dict] | List[Dict]): a batch of
+                prompts. It accepts: string prompt, a list of string prompts,
+                a chat history in OpenAI format or a list of chat history.
+            [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant."
+                },
+                {
+                    "role": "user",
+                    "content": "What is the capital of France?"
+                },
+                {
+                    "role": "assistant",
+                    "content": "The capital of France is Paris."
+                },
+                {
+                    "role": "user",
+                    "content": "Thanks!"
+                },
+                {
+                    "role": "assistant",
+                    "content": "You are welcome."
+                }
+            ]
+    """
+    # 将历史记录转换为openai格式
+    prompts = []
+    for user, assistant in history:
+        prompts.append(
+            {
+                "role": "user",
+                "content": user
+            }
+        )
+        prompts.append(
+            {
+                "role": "assistant",
+                "content": assistant
+            })
+    # 需要添加当前的query
+    prompts.append(
+        {
+            "role": "user",
+            "content": query
+        }
+    )
+    return prompts
+
+
+class DeployEngine(ABC):
+
+    @abstractmethod
+    def chat(
         self,
-        backend = Literal['transformers', 'lmdeploy'], # transformers, lmdeploy
-        transformers_config: TransformersConfig = None,
-        lmdeploy_config: LmdeployConfig = None,
-    ) -> None:
-        assert backend in ['transformers', 'lmdeploy'], f"backend must be 'transformers' or 'lmdeploy', but got {backend}"
-        self.backend = backend
+        *args,
+        **kwargs,
+    ) -> tuple[str, Sequence]:
+        """对话
 
-        self.transformers_config = transformers_config
-        self.lmdeploy_config = lmdeploy_config
+        Returns:
+            tuple[str, Sequence]: 回答和历史记录
+        """
+        pass
 
-        if backend == 'transformers':
-            assert transformers_config is not None, "transformers_config must not be None when backend is 'transformers'"
-            self.load_transformers_model(transformers_config)
-            logger.info("transformers model loaded")
-        elif backend == 'lmdeploy':
-            assert lmdeploy_config is not None, "lmdeploy_config must not be None when backend is 'lmdeploy'"
-            self.load_lmdeploy_model(lmdeploy_config)
-            logger.info("lmdeploy model loaded")
+    @abstractmethod
+    def chat_stream(
+        self,
+        *args,
+        **kwargs,
+    ) -> Generator[tuple[str, Sequence], None, None]:
+        """流式返回对话
 
-    def load_transformers_model(self, config: TransformersConfig) -> None:
+        Yields:
+            Generator[tuple[str, Sequence], None, None]: 回答和历史记录
+        """
+        pass
+
+
+class TransfomersEngine(DeployEngine):
+    def __init__(self, config: TransformersConfig) -> None:
         import torch
         import transformers
         from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
@@ -61,6 +132,9 @@ class InferEngine:
         logger.info(f"torch version: {torch.__version__}")
         logger.info(f"transformers version: {transformers.__version__}")
         logger.info(f"transformers config: {config}")
+
+        # transformers config
+        self.config = config
 
         # tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
@@ -100,7 +174,81 @@ class InferEngine:
 
         logger.info(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
 
-    def load_lmdeploy_model(self, config: LmdeployConfig) -> None:
+    def chat(
+        self,
+        query: str,
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        max_new_tokens: int = 1024,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        top_k: int = 40,
+        **kwargs,
+    ) -> tuple[str, Sequence]:
+        logger.info("gen_config: {}".format({
+            "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+        }))
+
+        logger.info(f"query: {query}")
+        # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
+        # chat 调用的 generate
+        response, history = self.model.chat(
+            tokenizer = self.tokenizer,
+            query = query,
+            history = history,
+            streamer = None,
+            max_new_tokens = max_new_tokens,
+            do_sample = True,
+            temperature = temperature,
+            top_p = top_p,
+            top_k = top_k,
+            meta_instruction = self.config.system_prompt,
+        )
+        logger.info(f"response: {response}")
+        logger.info(f"history: {history}")
+        return response, history
+
+    def chat_stream(
+        self,
+        query: str,
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        max_new_tokens: int = 1024,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        top_k: int = 40,
+        **kwargs,
+    ) -> Generator[tuple[str, Sequence], None, None]:
+        logger.info("gen_config: {}".format({
+            "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+        }))
+
+        logger.info(f"query: {query}")
+        # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
+        # stream_chat 返回的句子长度是逐渐边长的,length的作用是记录之前的输出长度,用来截断之前的输出
+        for response, history in self.model.stream_chat(
+                tokenizer = self.tokenizer,
+                query = query,
+                history = history,
+                max_new_tokens = max_new_tokens,
+                do_sample = True,
+                temperature = temperature,
+                top_p = top_p,
+                top_k = top_k,
+                meta_instruction = self.config.system_prompt,
+            ):
+            logger.info(f"response: {response}")
+            if response is not None:
+                yield response, history
+        logger.info(f"history: {history}")
+
+
+class LmdeployEngine(DeployEngine):
+    def __init__(self, config: LmdeployConfig) -> None:
         import lmdeploy
         from lmdeploy import pipeline, PytorchEngineConfig, TurbomindEngineConfig, ChatTemplateConfig, GenerationConfig
 
@@ -187,106 +335,7 @@ class InferEngine:
             min_new_tokens = None,
             skip_special_tokens = True,
         )
-
-    def __transformers_chat(
-        self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-        max_new_tokens: int = 1024,
-        temperature: float = 0.8,
-        top_p: float = 0.8,
-        top_k: int = 40,
-        **kwargs,
-    ) -> tuple[str, Sequence]:
-        logger.info("gen_config: {}".format({
-            "max_new_tokens": max_new_tokens,
-            "temperature": temperature,
-            "top_p": top_p,
-            "top_k": top_k,
-        }))
-
-        logger.info(f"query: {query}")
-        # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
-        # chat 调用的 generate
-        response, history = self.model.chat(
-            tokenizer = self.tokenizer,
-            query = query,
-            history = history,
-            streamer = None,
-            max_new_tokens = max_new_tokens,
-            do_sample = True,
-            temperature = temperature,
-            top_p = top_p,
-            top_k = top_k,
-            meta_instruction = self.transformers_config.system_prompt,
-        )
-        logger.info(f"response: {response}")
-        logger.info(f"history: {history}")
-        return response, history
-
-    def convert_history(
-        self,
-        query: str,
-        history: Sequence
-    ) -> list:
-        """
-        将历史记录转换为openai格式
-
-        Args:
-            query (str): query
-            history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-
-        Returns:
-            list: prompts (List[str] | str | List[Dict] | List[Dict]): a batch of
-                    prompts. It accepts: string prompt, a list of string prompts,
-                    a chat history in OpenAI format or a list of chat history.
-                [
-                    {
-                        "role": "system",
-                        "content": "You are a helpful assistant."
-                    },
-                    {
-                        "role": "user",
-                        "content": "What is the capital of France?"
-                    },
-                    {
-                        "role": "assistant",
-                        "content": "The capital of France is Paris."
-                    },
-                    {
-                        "role": "user",
-                        "content": "Thanks!"
-                    },
-                    {
-                        "role": "assistant",
-                        "content": "You are welcome."
-                    }
-                ]
-        """
-        # 将历史记录转换为openai格式
-        prompts = []
-        for user, assistant in history:
-            prompts.append(
-                {
-                    "role": "user",
-                    "content": user
-                }
-            )
-            prompts.append(
-                {
-                    "role": "assistant",
-                    "content": assistant
-                })
-        # 需要添加当前的query
-        prompts.append(
-            {
-                "role": "user",
-                "content": query
-            }
-        )
-        return prompts
-
-    def __lmdeploy_chat(
+    def chat(
         self,
         query: str,
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
@@ -297,7 +346,7 @@ class InferEngine:
         **kwargs,
     ) -> tuple[str, Sequence]:
         # 将历史记录转换为openai格式
-        prompts = self.convert_history(query, history)
+        prompts = convert_history(query, history)
 
         # 更新生成config
         self.gen_config.max_new_tokens = max_new_tokens
@@ -320,90 +369,7 @@ class InferEngine:
         logger.info(f"history: {history}")
         return response.text, history
 
-    def chat(
-        self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-        max_new_tokens: int = 1024,
-        temperature: float = 0.8,
-        top_p: float = 0.8,
-        top_k: int = 40,
-        **kwargs,
-    ) -> tuple[str, Sequence]:
-        """对话
-
-        Args:
-            query (str): 问题
-            history (Sequence, optional): 对话历史. Defaults to [].
-                example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-            max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
-            temperature (float, optional): temperature. Defaults to 0.8.
-            top_p (float, optional): top_p. Defaults to 0.8.
-            top_k (int, optional): top_k. Defaults to 40.
-
-        Returns:
-            tuple[str, Sequence]: 回答和历史记录
-        """
-        history = [] if history is None else list(history)
-
-        if self.backend == 'transformers':
-            return self.__transformers_chat(
-                query = query,
-                history = history,
-                max_new_tokens = max_new_tokens,
-                temperature = temperature,
-                top_p = top_p,
-                top_k = top_k,
-                **kwargs
-            )
-        elif self.backend == 'lmdeploy':
-            return self.__lmdeploy_chat(
-                query = query,
-                history = history,
-                max_new_tokens = max_new_tokens,
-                temperature = temperature,
-                top_p = top_p,
-                top_k = top_k,
-                **kwargs
-            )
-
-    def __transformers_chat_stream(
-        self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-        max_new_tokens: int = 1024,
-        temperature: float = 0.8,
-        top_p: float = 0.8,
-        top_k: int = 40,
-        **kwargs,
-    ) -> Generator[tuple[str, Sequence], None, None]:
-        logger.info("gen_config: {}".format({
-            "max_new_tokens": max_new_tokens,
-            "temperature": temperature,
-            "top_p": top_p,
-            "top_k": top_k,
-        }))
-
-        logger.info(f"query: {query}")
-        # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
-        # stream_chat 返回的句子长度是逐渐边长的,length的作用是记录之前的输出长度,用来截断之前的输出
-        for response, history in self.model.stream_chat(
-                tokenizer = self.tokenizer,
-                query = query,
-                history = history,
-                max_new_tokens = max_new_tokens,
-                do_sample = True,
-                temperature = temperature,
-                top_p = top_p,
-                top_k = top_k,
-                meta_instruction = self.transformers_config.system_prompt,
-            ):
-            logger.info(f"response: {response}")
-            if response is not None:
-                yield response, history
-        logger.info(f"history: {history}")
-
-    def __lmdeploy_chat_stream(
+    def chat_stream(
         self,
         query: str,
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
@@ -414,7 +380,7 @@ class InferEngine:
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
         # 将历史记录转换为openai格式
-        prompts = self.convert_history(query, history)
+        prompts = convert_history(query, history)
 
         # 更新生成config
         self.gen_config.max_new_tokens = max_new_tokens
@@ -442,6 +408,61 @@ class InferEngine:
         logger.info(f"response: {response}")
         logger.info(f"history: {history}")
 
+
+class InferEngine(DeployEngine):
+    def __init__(
+        self,
+        backend: Literal['transformers', 'lmdeploy'] = 'transformers',
+        transformers_config: TransformersConfig = None,
+        lmdeploy_config: LmdeployConfig = None,
+    ) -> None:
+        assert backend in ['transformers', 'lmdeploy'], f"backend must be 'transformers' or 'lmdeploy', but got {backend}"
+        self.backend = backend
+
+        if backend == 'transformers':
+            assert transformers_config is not None, "transformers_config must not be None when backend is 'transformers'"
+            self.engine = TransfomersEngine(transformers_config)
+            logger.info("transformers model loaded")
+        elif backend == 'lmdeploy':
+            assert lmdeploy_config is not None, "lmdeploy_config must not be None when backend is 'lmdeploy'"
+            self.engine = LmdeployEngine(lmdeploy_config)
+            logger.info("lmdeploy model loaded")
+
+    def chat(
+        self,
+        query: str,
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        max_new_tokens: int = 1024,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        top_k: int = 40,
+        **kwargs,
+    ) -> tuple[str, Sequence]:
+        """对话
+
+        Args:
+            query (str): 问题
+            history (Sequence, optional): 对话历史. Defaults to [].
+                example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+            max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
+            temperature (float, optional): temperature. Defaults to 0.8.
+            top_p (float, optional): top_p. Defaults to 0.8.
+            top_k (int, optional): top_k. Defaults to 40.
+
+        Returns:
+            tuple[str, Sequence]: 回答和历史记录
+        """
+        history = [] if history is None else list(history)
+        return self.engine.chat(
+            query = query,
+            history = history,
+            max_new_tokens = max_new_tokens,
+            temperature = temperature,
+            top_p = top_p,
+            top_k = top_k,
+            **kwargs
+        )
+
     def chat_stream(
         self,
         query: str,
@@ -467,24 +488,12 @@ class InferEngine:
             Generator[tuple[str, Sequence], None, None]: 回答和历史记录
         """
         history = [] if history is None else list(history)
-
-        if self.backend == 'transformers':
-            return self.__transformers_chat_stream(
-                query = query,
-                history = history,
-                max_new_tokens = max_new_tokens,
-                temperature = temperature,
-                top_p = top_p,
-                top_k = top_k,
-                **kwargs
-            )
-        elif self.backend == 'lmdeploy':
-            return self.__lmdeploy_chat_stream(
-                query = query,
-                history = history,
-                max_new_tokens = max_new_tokens,
-                temperature = temperature,
-                top_p = top_p,
-                top_k = top_k,
-                **kwargs
-            )
+        return self.engine.chat_stream(
+            query = query,
+            history = history,
+            max_new_tokens = max_new_tokens,
+            temperature = temperature,
+            top_p = top_p,
+            top_k = top_k,
+            **kwargs
+        )
