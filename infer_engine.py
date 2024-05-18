@@ -285,7 +285,8 @@ class TransfomersEngine(DeployEngine):
 
                 self.cache.extend(value.tolist())
                 token = self.tokenizer.decode(self.cache, skip_special_tokens=True)
-                if token.strip() != "<|im_end|>":
+                # if token.strip() != "<|im_end|>":
+                if token.strip() != self.tokenizer.eos_token: # <|im_end|> 仅用于 InternLM2,不适用于其他模型,这个改为 eos_token 是为了通用性
                     self.response = self.response + token
                     history = self.history + [(self.query, self.response)]
                     self.queue.put((self.response, history))
