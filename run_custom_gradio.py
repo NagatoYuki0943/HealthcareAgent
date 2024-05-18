@@ -121,6 +121,8 @@ def chat(
     yield history + [[query, response + references_str]]
     logger.info(f"references_str: {references_str}")
     logger.info(f"history_without_rag: {history + [[query, response + references_str]]}")
+    # 查看GPU使用情况
+    os.system("nvidia-smi")
 
 
 def regenerate(
