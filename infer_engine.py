@@ -1,12 +1,15 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import Generator, Literal, Sequence, Any
+from typing import Generator, AsyncGenerator, Literal, Sequence, Any
 import torch
 import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from transformers.generation.streamers import BaseStreamer
 import queue
-import threading
+from threading import Thread
+from queue import Empty, Queue
+import asyncio
+import random
 from loguru import logger
 
 
@@ -31,11 +34,14 @@ class LmdeployConfig:
     cache_max_entry_count: float = 0.8  # 调整 KV Cache 的占用比例为0.8
     quant_policy: int = 0               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     model_name: str = 'internlm2'
-    custom_model_name: str = 'internlm2_chat_1_8b'
     system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
     - InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室). It is designed to be helpful, honest, and harmless.
     - InternLM (书生·浦语) can understand and communicate fluently in the language chosen by the user such as English and 中文.
     """
+    log_level: Literal['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'] = 'ERROR'
+    deploy_method: Literal['local', 'server'] = 'local'
+    server_name: str = '0.0.0.0'
+    server_port: int = 23333
 
 
 def convert_history(
@@ -50,9 +56,7 @@ def convert_history(
         history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
 
     Returns:
-        list: prompts (List[str] | str | List[Dict] | List[Dict]): a batch of
-                prompts. It accepts: string prompt, a list of string prompts,
-                a chat history in OpenAI format or a list of chat history.
+        list: a chat history in OpenAI format or a list of chat history.
             [
                 {
                     "role": "system",
@@ -77,27 +81,27 @@ def convert_history(
             ]
     """
     # 将历史记录转换为openai格式
-    prompts = []
+    prompt = []
     for user, assistant in history:
-        prompts.append(
+        prompt.append(
             {
                 "role": "user",
                 "content": user
             }
         )
-        prompts.append(
+        prompt.append(
             {
                 "role": "assistant",
                 "content": assistant
             })
     # 需要添加当前的query
-    prompts.append(
+    prompt.append(
         {
             "role": "user",
             "content": query
         }
     )
-    return prompts
+    return prompt
 
 
 class DeployEngine(ABC):
@@ -311,7 +315,7 @@ class TransfomersEngine(DeployEngine):
             )
 
         def consumer():
-            producer = threading.Thread(target=stream_producer)
+            producer = Thread(target=stream_producer)
             producer.start()
             while True:
                 res = response_queue.get()
@@ -329,8 +333,12 @@ class TransfomersEngine(DeployEngine):
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
+        session_id: int | None = None,
         **kwargs,
     ) -> tuple[str, Sequence]:
+        # session_id
+        logger.info(f"{session_id = }")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -365,8 +373,12 @@ class TransfomersEngine(DeployEngine):
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
+        session_id: int | None = None,
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
+        # session_id
+        logger.info(f"{session_id = }")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -395,7 +407,7 @@ class TransfomersEngine(DeployEngine):
         logger.info(f"history: {history}")
 
 
-class LmdeployEngine(DeployEngine):
+class LmdeployLocalEngine(DeployEngine):
     def __init__(self, config: LmdeployConfig) -> None:
         import lmdeploy
         from lmdeploy import pipeline, PytorchEngineConfig, TurbomindEngineConfig, ChatTemplateConfig, GenerationConfig
@@ -422,7 +434,7 @@ class LmdeployEngine(DeployEngine):
                 max_batch_size = 128,
                 cache_max_entry_count = config.cache_max_entry_count,
                 cache_block_seq_len = 64,
-                quant_policy = config.quant_policy,                    # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
+                quant_policy = config.quant_policy, # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
                 rope_scaling_factor = 0.0,
                 use_logn_attn = False,
                 download_dir = None,
@@ -452,7 +464,7 @@ class LmdeployEngine(DeployEngine):
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/_modules/lmdeploy/model.html#ChatTemplateConfig
         chat_template_config = ChatTemplateConfig(
-            model_name = config.model_name,
+            model_name = config.model_name, # All the chat template names: `lmdeploy list`
             system = None,
             meta_instruction = config.system_prompt,
         )
@@ -463,9 +475,10 @@ class LmdeployEngine(DeployEngine):
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py
         self.pipe = pipeline(
             model_path = config.model_path,
-            model_name = config.custom_model_name,
+            model_name = None,
             backend_config = backend_config,
             chat_template_config = chat_template_config,
+            log_level = config.log_level
         )
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
@@ -483,6 +496,220 @@ class LmdeployEngine(DeployEngine):
             min_new_tokens = None,
             skip_special_tokens = True,
         )
+
+    # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py#L453-L528
+    def __stream_infer(
+        self,
+        prompts: list[str] | str | list[dict] | list[list[dict]],
+        session_ids: int | list[int],
+        gen_config = None,
+        do_preprocess: bool = True,
+        adapter_name: str | None = None,
+        **kwargs
+    ) -> Generator:
+        """Inference a batch of prompts with stream mode.
+
+        Args:
+            prompts (List[str] | str | List[Dict] | List[Dict]): a batch of
+                prompts. It accepts: string prompt, a list of string prompts,
+                a chat history in OpenAI format or a list of chat history.
+            session_ids (List[int] | int): a batch of session ids.
+            gen_config (GenerationConfig | None): a instance of or a list of
+                GenerationConfig. Default to None.
+            do_preprocess (bool): whether pre-process the messages. Default to
+                True, which means chat_template will be applied.
+            adapter_name (str): the adapter name of slora for pytorch backend.
+                Pick one from adapters. Default to None, using the base model.
+        """
+        from lmdeploy.messages import GenerationConfig, Response
+        from lmdeploy.serve.async_engine import _get_event_loop
+
+        need_list_wrap = isinstance(prompts, str) or isinstance(
+            prompts[0], dict)
+        prompts = [prompts] if need_list_wrap else prompts
+        need_list_wrap = isinstance(session_ids, int)
+        session_ids = [session_ids] if need_list_wrap else session_ids
+
+        assert isinstance(prompts, list), 'prompts should be a list'
+        assert len(prompts) == len(session_ids), 'the length of prompts and session_ids should be the same'
+
+        if gen_config is None:
+            gen_config = GenerationConfig()
+        # set random if it is not set
+        if not isinstance(gen_config, list) and gen_config.random_seed is None:
+            gen_config.random_seed = random.getrandbits(64)
+        if not isinstance(gen_config, list):
+            gen_config = [gen_config] * len(prompts)
+        assert len(prompts) == len(gen_config),\
+                'input gen_confg length differs from the length of prompts' # noqa
+        outputs = Queue()
+        generators = []
+        # for i, prompt in enumerate(prompts):
+        for prompt, session_id, gen_conf in zip(prompts, session_ids, gen_config):
+            generators.append(
+                self.pipe.generate(prompt,
+                              session_id,   # i
+                              gen_config=gen_conf,  # gen_config[i]
+                              stream_response=True,
+                              sequence_start=True,
+                              sequence_end=True,
+                              do_preprocess=do_preprocess,
+                              adapter_name=adapter_name,
+                              **kwargs))
+
+        async def _inner_call(i, generator):
+            async for out in generator:
+                outputs.put(
+                    Response(out.response, out.generate_token_len,
+                             out.input_token_len, i, out.finish_reason,
+                             out.token_ids, out.logprobs))
+
+        async def gather():
+            await asyncio.gather(
+                # *[_inner_call(i, generators[i]) for i in range(len(prompts))])
+                *[_inner_call(session_id, generator) for session_id, generator in zip(session_ids, generators)])
+            outputs.put(None)
+
+        loop = _get_event_loop()
+        proc = Thread(target=lambda: loop.run_until_complete(gather()))
+        proc.start()
+
+        while True:
+            try:
+                out = outputs.get(timeout=0.001)
+                if out is None:
+                    break
+                yield out
+            except Empty:
+                pass
+
+        proc.join()
+
+    # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py#L453-L528
+    def __stream_infer_single(
+        self,
+        prompt: str | list[dict],
+        session_id: int,
+        gen_config = None,
+        do_preprocess: bool = True,
+        adapter_name: str | None = None,
+        **kwargs
+    ) -> Generator:
+        """Inference a batch of prompts with stream mode.
+        将输入的promot限制在一条
+
+        Args:
+            prompt (str | list[dict]): a prompt. It accepts: string prompt,
+            a chat history in OpenAI format.
+            session_id (int): a session id.
+            gen_config (GenerationConfig | None): a instance of or a list of
+                GenerationConfig. Default to None.
+            do_preprocess (bool): whether pre-process the messages. Default to
+                True, which means chat_template will be applied.
+            adapter_name (str): the adapter name of slora for pytorch backend.
+                Pick one from adapters. Default to None, using the base model.
+        """
+        from lmdeploy.messages import GenerationConfig, Response
+        from lmdeploy.serve.async_engine import _get_event_loop
+
+        if gen_config is None:
+            gen_config = GenerationConfig()
+        # set random if it is not set
+        if gen_config.random_seed is None:
+            gen_config.random_seed = random.getrandbits(64)
+
+        outputs = Queue()
+        generator = self.pipe.generate(prompt,
+                              session_id,
+                              gen_config=gen_config,
+                              stream_response=True,
+                              sequence_start=True,
+                              sequence_end=True,
+                              do_preprocess=do_preprocess,
+                              adapter_name=adapter_name,
+                              **kwargs)
+
+        async def _inner_call(i, generator):
+            async for out in generator:
+                outputs.put(
+                    Response(out.response, out.generate_token_len,
+                             out.input_token_len, i, out.finish_reason,
+                             out.token_ids, out.logprobs))
+
+        async def gather():
+            await asyncio.gather(
+                _inner_call(session_id, generator))
+            outputs.put(None)
+
+        loop = _get_event_loop()
+        proc = Thread(target=lambda: loop.run_until_complete(gather()))
+        proc.start()
+
+        while True:
+            try:
+                out = outputs.get(timeout=0.001)
+                if out is None:
+                    break
+                yield out
+            except Empty:
+                pass
+
+        proc.join()
+
+    # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/gradio/turbomind_coupled.py#L21-L67
+    async def chat_stream_local(
+        self,
+        prompt: str | list[dict],
+        session_id: int,
+        gen_config = None,
+        do_preprocess: bool = True,
+        adapter_name: str | None = None,
+        **kwargs
+    ) -> AsyncGenerator:
+        """stream chat 异步实现
+
+        Args:
+            prompt (str | list[dict]): a prompt. It accepts: string prompt,
+            a chat history in OpenAI format.
+            session_id (int): a session id.
+            gen_config (GenerationConfig | None): a instance of or a list of
+                GenerationConfig. Default to None.
+            do_preprocess (bool): whether pre-process the messages. Default to
+                True, which means chat_template will be applied.
+            adapter_name (str): the adapter name of slora for pytorch backend.
+                Pick one from adapters. Default to None, using the base model.
+        """
+        from lmdeploy.messages import GenerationConfig
+        from lmdeploy.serve.async_engine import GenOut
+        from lmdeploy.messages import Response
+
+        if gen_config is None:
+            gen_config = GenerationConfig()
+        # set random if it is not set
+        if gen_config.random_seed is None:
+            gen_config.random_seed = random.getrandbits(64)
+
+        output: GenOut
+        async for output in self.pipe.generate(
+                prompt,
+                session_id,
+                gen_config=gen_config,
+                stream_response=True,
+                sequence_start=True,
+                sequence_end=True,
+                do_preprocess=do_preprocess,
+                adapter_name=adapter_name,
+            ):
+            yield Response(
+                text=output.response,
+                generate_token_len=output.generate_token_len,
+                input_token_len=output.input_token_len,
+                session_id=session_id,
+                finish_reason=output.finish_reason,
+                token_ids=output.token_ids,
+                logprobs=output.logprobs,
+            )
+
     def chat(
         self,
         query: str,
@@ -491,10 +718,14 @@ class LmdeployEngine(DeployEngine):
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
+        session_id: int | None = None,
         **kwargs,
     ) -> tuple[str, Sequence]:
+        # session_id
+        logger.info(f"{session_id = }")
+
         # 将历史记录转换为openai格式
-        prompts = convert_history(query, history)
+        prompt = convert_history(query, history)
 
         # 更新生成config
         self.gen_config.max_new_tokens = max_new_tokens
@@ -507,7 +738,7 @@ class LmdeployEngine(DeployEngine):
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
         response = self.pipe(
-            prompts = prompts,
+            prompts = prompt,
             gen_config = self.gen_config,
             do_preprocess = True,
             adapter_name = None
@@ -525,10 +756,15 @@ class LmdeployEngine(DeployEngine):
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
+        session_id: int | None = None,
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
+        # session_id
+        session_id = random.randint(1, 1e9) if session_id is None else session_id
+        logger.info(f"{session_id = }")
+
         # 将历史记录转换为openai格式
-        prompts = convert_history(query, history)
+        prompt = convert_history(query, history)
 
         # 更新生成config
         self.gen_config.max_new_tokens = max_new_tokens
@@ -541,8 +777,11 @@ class LmdeployEngine(DeployEngine):
         response = ""
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
-        for _response in self.pipe.stream_infer(
-            prompts = prompts,
+        # for _response in self.pipe.stream_infer(
+        for _response in self.__stream_infer_single(
+        # async for _response in self.chat_stream_local(
+            prompt = prompt,
+            session_id = session_id,
             gen_config = self.gen_config,
             do_preprocess = True,
             adapter_name = None
@@ -573,7 +812,11 @@ class InferEngine(DeployEngine):
             logger.info("transformers model loaded")
         elif backend == 'lmdeploy':
             assert lmdeploy_config is not None, "lmdeploy_config must not be None when backend is 'lmdeploy'"
-            self.engine = LmdeployEngine(lmdeploy_config)
+            assert lmdeploy_config.deploy_method in ['local', 'server'], f"deploy_method must be 'local' or 'server', but got {lmdeploy_config.deploy_method}"
+            if lmdeploy_config.deploy_method == 'local':
+                self.engine = LmdeployLocalEngine(lmdeploy_config)
+            elif lmdeploy_config.deploy_method == 'server':
+                raise NotImplementedError
             logger.info("lmdeploy model loaded")
 
     def chat(
@@ -584,6 +827,7 @@ class InferEngine(DeployEngine):
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
+        session_id: int | None = None,
         **kwargs,
     ) -> tuple[str, Sequence]:
         """对话
@@ -596,6 +840,7 @@ class InferEngine(DeployEngine):
             temperature (float, optional): temperature. Defaults to 0.8.
             top_p (float, optional): top_p. Defaults to 0.8.
             top_k (int, optional): top_k. Defaults to 40.
+            session_id (int, optional): 会话id. Defaults to None.
 
         Returns:
             tuple[str, Sequence]: 回答和历史记录
@@ -608,6 +853,7 @@ class InferEngine(DeployEngine):
             temperature = temperature,
             top_p = top_p,
             top_k = top_k,
+            session_id = session_id,
             **kwargs
         )
 
@@ -619,6 +865,7 @@ class InferEngine(DeployEngine):
         temperature: float = 0.8,
         top_p: float = 0.8,
         top_k: int = 40,
+        session_id: int | None = None,
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
         """流式返回对话
@@ -631,6 +878,7 @@ class InferEngine(DeployEngine):
             temperature (float, optional): temperature. Defaults to 0.8.
             top_p (float, optional): top_p. Defaults to 0.8.
             top_k (int, optional): top_k. Defaults to 40.
+            session_id (int, optional): 会话id. Defaults to None.
 
         Yields:
             Generator[tuple[str, Sequence], None, None]: 回答和历史记录
@@ -643,5 +891,6 @@ class InferEngine(DeployEngine):
             temperature = temperature,
             top_p = top_p,
             top_k = top_k,
+            session_id = session_id,
             **kwargs
         )

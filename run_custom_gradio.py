@@ -3,6 +3,7 @@ from infer_engine import InferEngine, TransformersConfig
 from database import VectorDatabase
 import gradio as gr
 from typing import Generator, Sequence
+import threading
 from loguru import logger
 from utils import remove_history_references
 
@@ -77,6 +78,11 @@ infer_engine = InferEngine(
 )
 
 
+class InterFace:
+    global_session_id: int = 0
+    lock = threading.Lock()
+
+
 def chat(
     query: str,
     history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
@@ -84,6 +90,7 @@ def chat(
     temperature: float = 0.8,
     top_p: float = 0.8,
     top_k: int = 40,
+    session_id: int | None = None,
 ) -> Generator[Sequence, None, None]:
     history = [] if history is None else list(history)
 
@@ -114,6 +121,7 @@ def chat(
         temperature = temperature,
         top_p = top_p,
         top_k = top_k,
+        session_id = session_id,
     ):
         yield history + [[query, response]]
 
@@ -132,6 +140,7 @@ def regenerate(
     temperature: float = 0.8,
     top_p: float = 0.8,
     top_k: int = 40,
+    session_id: int | None = None,
 ) -> Generator[Sequence, None, None]:
     history = [] if history is None else list(history)
 
@@ -145,6 +154,7 @@ def regenerate(
             temperature = temperature,
             top_p = top_p,
             top_k = top_k,
+            session_id = session_id,
         )
     else:
         yield history
@@ -162,6 +172,8 @@ def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
 def main():
     block = gr.Blocks()
     with block as demo:
+        state_session_id = gr.State(0)
+
         with gr.Row(equal_height=True):
             with gr.Column(scale=15):
                 gr.Markdown("""<h1><center>Healthcare Agent</center></h1>
@@ -240,7 +252,7 @@ def main():
             # 回车提交
             query.submit(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k],
+                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
                 outputs=[chatbot]
             )
 
@@ -254,7 +266,7 @@ def main():
             # 按钮提交
             submit.click(
                 chat,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k],
+                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
                 outputs=[chatbot]
             )
 
@@ -268,7 +280,7 @@ def main():
             # 重新生成
             regen.click(
                 regenerate,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k],
+                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
                 outputs=[chatbot]
             )
 
@@ -282,6 +294,15 @@ def main():
         gr.Markdown("""
         ### 内容由 AI 大模型生成，不构成专业医疗意见或诊断。
         """)
+
+        # 初始化session_id
+        def init():
+            with InterFace.lock:
+                InterFace.global_session_id += 1
+            new_session_id = InterFace.global_session_id
+            return new_session_id
+
+        demo.load(init, inputs=None, outputs=[state_session_id])
 
     # threads to consume the request
     gr.close_all()
