@@ -318,6 +318,7 @@ class TransfomersEngine(DeployEngine):
             producer = Thread(target=stream_producer)
             # 启动多线程
             producer.start()
+            # 下面的命令是在主线程中运行的
             while True:
                 res = response_queue.get()
                 if res is None:
