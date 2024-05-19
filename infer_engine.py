@@ -827,12 +827,13 @@ class LmdeployServeEngine(LmdeployEngine):
     def __init__(self, config: LmdeployConfig) -> None:
         super().__init__(config)
 
-        from lmdeploy import serve
+        from lmdeploy import serve, client
 
+        # 启动服务
         # https://lmdeploy.readthedocs.io/zh-cn/latest/serving/api_server.html
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_server.py
-        self.serve = serve(
+        serve(
             model_path = config.model_path,
             model_name = None,
             backend = config.backend,
@@ -848,6 +849,14 @@ class LmdeployServeEngine(LmdeployEngine):
         self.api_server_url = f'http://{config.server_name}:{config.server_port}'
         self.api_key = config.api_keys
 
+        # 启动一个 client,所有访问共同使用一个 client,不清楚是否有影响
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_client.py
+        self.api_client = client(
+            api_server_url = self.api_server_url,
+            api_key = self.api_key
+        )
+
     def chat_interactive_v1(
         self,
         query: str,
@@ -860,15 +869,6 @@ class LmdeployServeEngine(LmdeployEngine):
         stream: bool = True,
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
-        from lmdeploy import client
-
-        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
-        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_client.py
-        api_client = client(
-            api_server_url = self.api_server_url,
-            api_key = self.api_key
-        )
-
         # session_id
         session_id = random.randint(1, 1e9) if session_id is None else session_id
         logger.info(f"{session_id = }")
@@ -886,11 +886,11 @@ class LmdeployServeEngine(LmdeployEngine):
         logger.info(f"query: {query}")
         response_text = ""
         response: dict
-        for response in api_client.chat_interactive_v1(
+        for response in self.api_client.chat_interactive_v1(
             prompt = prompt,
             session_id = session_id,
             interactive_mode = False,
-            stream = stream,
+            stream = stream,                     # 是否使用流式传输
             stop = None,
             request_output_len = max_new_tokens, # 不确定是不是同一个参数
             top_p = top_p,

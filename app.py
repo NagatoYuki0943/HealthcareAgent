@@ -99,7 +99,8 @@ LMDEPLOY_CONFIG = LmdeployConfig(
     quant_policy = 0,               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     model_name = 'internlm2',
     custom_model_name = 'internlm2_chat_doctor',
-    system_prompt = SYSTEM_PROMPT
+    system_prompt = SYSTEM_PROMPT,
+    deploy_method = 'local'
 )
 
 # 载入模型
