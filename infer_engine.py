@@ -39,9 +39,11 @@ class LmdeployConfig:
     - InternLM (书生·浦语) can understand and communicate fluently in the language chosen by the user such as English and 中文.
     """
     log_level: Literal['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'] = 'ERROR'
-    deploy_method: Literal['local', 'server'] = 'local'
+    deploy_method: Literal['local', 'serve'] = 'local'
     server_name: str = '0.0.0.0'
     server_port: int = 23333
+    api_keys: list[str] | str | None = None
+    ssl: bool = False
 
 
 def convert_history(
@@ -409,7 +411,7 @@ class TransfomersEngine(DeployEngine):
         logger.info(f"history: {history}")
 
 
-class LmdeployLocalEngine(DeployEngine):
+class LmdeployEngine(DeployEngine):
     def __init__(self, config: LmdeployConfig) -> None:
         import lmdeploy
         from lmdeploy import pipeline, PytorchEngineConfig, TurbomindEngineConfig, ChatTemplateConfig, GenerationConfig
@@ -425,10 +427,12 @@ class LmdeployLocalEngine(DeployEngine):
             f"cache_max_entry_count must be >= 0.0 and <= 1.0, but got {config.cache_max_entry_count}"
         assert config.quant_policy in [0, 4, 8], f"quant_policy must be 0, 4 or 8, but got {config.quant_policy}"
 
+        self.config = config
+
         if config.backend == 'turbomind':
             # 可以直接使用transformers的模型,会自动转换格式
             # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#turbomindengineconfig
-            backend_config = TurbomindEngineConfig(
+            self.backend_config = TurbomindEngineConfig(
                 model_name = config.model_name,
                 model_format = config.model_format, # The format of input model. `hf` meaning `hf_llama`, `llama` meaning `meta_llama`, `awq` meaning the quantized model by awq. Default: None. Type: str
                 tp = 1,
@@ -445,7 +449,7 @@ class LmdeployLocalEngine(DeployEngine):
             )
         else:
             # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#pytorchengineconfig
-            backend_config = PytorchEngineConfig(
+            self.backend_config = PytorchEngineConfig(
                 model_name = config.model_name,
                 tp = 1,
                 session_len = 8192,
@@ -462,15 +466,22 @@ class LmdeployLocalEngine(DeployEngine):
                 download_dir = None,
                 revision = None,
             )
-        logger.info(f"lmdeploy backend_config: {backend_config}")
+        logger.info(f"lmdeploy backend_config: {self.backend_config}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/_modules/lmdeploy/model.html#ChatTemplateConfig
-        chat_template_config = ChatTemplateConfig(
+        self.chat_template_config = ChatTemplateConfig(
             model_name = config.model_name, # All the chat template names: `lmdeploy list`
             system = None,
             meta_instruction = config.system_prompt,
         )
-        logger.info(f"lmdeploy chat_template_config: {chat_template_config}")
+        logger.info(f"lmdeploy chat_template_config: {self.chat_template_config}")
+
+
+class LmdeployLocalEngine(LmdeployEngine):
+    def __init__(self, config: LmdeployConfig) -> None:
+        super().__init__(config)
+
+        from lmdeploy import pipeline, GenerationConfig
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
@@ -478,8 +489,8 @@ class LmdeployLocalEngine(DeployEngine):
         self.pipe = pipeline(
             model_path = config.model_path,
             model_name = None,
-            backend_config = backend_config,
-            chat_template_config = chat_template_config,
+            backend_config = self.backend_config,
+            chat_template_config = self.chat_template_config,
             log_level = config.log_level
         )
 
@@ -727,6 +738,8 @@ class LmdeployLocalEngine(DeployEngine):
         session_id: int | None = None,
         **kwargs,
     ) -> tuple[str, Sequence]:
+        from lmdeploy.messages import Response
+
         # session_id
         logger.info(f"{session_id = }")
 
@@ -743,16 +756,20 @@ class LmdeployLocalEngine(DeployEngine):
         logger.info(f"query: {query}")
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
+        response: Response
         response = self.pipe(
             prompts = prompt,
             gen_config = self.gen_config,
             do_preprocess = True,
             adapter_name = None
         )
-        history.append([query, response.text])
         logger.info(f"response: {response}")
+        response_text = response.text
+        logger.info(f"response_text: {response_text}")
+        history.append([query, response_text])
         logger.info(f"history: {history}")
-        return response.text, history
+
+        return response_text, history
 
     def chat_stream(
         self,
@@ -765,6 +782,8 @@ class LmdeployLocalEngine(DeployEngine):
         session_id: int | None = None,
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
+        from lmdeploy.messages import Response
+
         # session_id
         session_id = random.randint(1, 1e9) if session_id is None else session_id
         logger.info(f"{session_id = }")
@@ -780,26 +799,161 @@ class LmdeployLocalEngine(DeployEngine):
         logger.info(f"gen_config: {self.gen_config}")
 
         logger.info(f"query: {query}")
-        response = ""
+        response_text = ""
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
-        # for _response in self.pipe.stream_infer(
-        for _response in self.__stream_infer_single(
-        # async for _response in self.chat_stream_local(
+        response: Response
+        # for response in self.pipe.stream_infer(
+        for response in self.__stream_infer_single(
+        # async for response in self.chat_stream_local(
             prompt = prompt,
             session_id = session_id,
             gen_config = self.gen_config,
             do_preprocess = True,
             adapter_name = None
         ):
-            logger.info(_response)
+            logger.info(f"response: {response}")
             # Response(text='很高兴', generate_token_len=10, input_token_len=111, session_id=0, finish_reason=None)
             # Response(text='认识', generate_token_len=11, input_token_len=111, session_id=0, finish_reason=None)
             # Response(text='你', generate_token_len=12, input_token_len=111, session_id=0, finish_reason=None)
-            response += _response.text
-            yield response, history + [[query, response]]
-        logger.info(f"response: {response}")
-        logger.info(f"history: {history}")
+            response_text += response.text
+            yield response_text, history + [[query, response_text]]
+
+        logger.info(f"response_text: {response_text}")
+        logger.info(f"history: {history + [[query, response_text]]}")
+
+
+class LmdeployServeEngine(LmdeployEngine):
+    def __init__(self, config: LmdeployConfig) -> None:
+        super().__init__(config)
+
+        from lmdeploy import serve
+
+        # https://lmdeploy.readthedocs.io/zh-cn/latest/serving/api_server.html
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_server.py
+        self.serve = serve(
+            model_path = config.model_path,
+            model_name = None,
+            backend = config.backend,
+            backend_config = self.backend_config,
+            chat_template_config = self.chat_template_config,
+            server_name = config.server_name,
+            server_port = config.server_port,
+            log_level = config.log_level,
+            api_keys = config.api_keys,
+            ssl = config.ssl,
+        )
+
+        self.api_server_url = f'http://{config.server_name}:{config.server_port}'
+        self.api_key = config.api_keys
+
+    def chat_interactive_v1(
+        self,
+        query: str,
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        max_new_tokens: int = 1024,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        top_k: int = 40,
+        session_id: int | None = None,
+        stream: bool = True,
+        **kwargs,
+    ) -> Generator[tuple[str, Sequence], None, None]:
+        from lmdeploy import client
+
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_client.py
+        api_client = client(
+            api_server_url = self.api_server_url,
+            api_key = self.api_key
+        )
+
+        # session_id
+        session_id = random.randint(1, 1e9) if session_id is None else session_id
+        logger.info(f"{session_id = }")
+
+        # 将历史记录转换为openai格式
+        prompt = convert_history(query, history)
+
+        logger.info("gen_config: {}".format({
+            "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+        }))
+
+        logger.info(f"query: {query}")
+        response_text = ""
+        response: dict
+        for response in api_client.chat_interactive_v1(
+            prompt = prompt,
+            session_id = session_id,
+            interactive_mode = False,
+            stream = stream,
+            stop = None,
+            request_output_len = max_new_tokens, # 不确定是不是同一个参数
+            top_p = top_p,
+            top_k = top_k,
+            temperature = temperature,
+            repetition_penalty = 1.0,
+            ignore_eos = False,
+            skip_special_tokens = True,
+            adapter_name = None,
+        ):
+            logger.info(f"response: {response}")
+            response_text += response.get("text", "")
+            yield response_text, history + [[query, response_text]]
+
+        logger.info(f"response_text: {response_text}")
+        logger.info(f"history: {history + [[query, response_text]]}")
+
+    def chat(
+        self,
+        query: str,
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        max_new_tokens: int = 1024,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        top_k: int = 40,
+        session_id: int | None = None,
+        **kwargs,
+    ) -> tuple[str, Sequence]:
+        # 将 generator 转换为 list,返回第一次输出
+        return list(self.chat_interactive_v1(
+            query = query,
+            history = history,
+            max_new_tokens = max_new_tokens,
+            temperature = temperature,
+            top_p = top_p,
+            top_k = top_k,
+            session_id = session_id,
+            stream = False, # don't use stream
+            **kwargs,
+        ))[0]
+
+    def chat_stream(
+        self,
+        query: str,
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        max_new_tokens: int = 1024,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        top_k: int = 40,
+        session_id: int | None = None,
+        **kwargs,
+    ) -> Generator[tuple[str, Sequence], None, None]:
+        return self.chat_interactive_v1(
+            query = query,
+            history = history,
+            max_new_tokens = max_new_tokens,
+            temperature = temperature,
+            top_p = top_p,
+            top_k = top_k,
+            session_id = session_id,
+            stream = True,  # use stream
+            **kwargs,
+        )
 
 
 class InferEngine(DeployEngine):
@@ -818,11 +972,11 @@ class InferEngine(DeployEngine):
             logger.info("transformers model loaded")
         elif backend == 'lmdeploy':
             assert lmdeploy_config is not None, "lmdeploy_config must not be None when backend is 'lmdeploy'"
-            assert lmdeploy_config.deploy_method in ['local', 'server'], f"deploy_method must be 'local' or 'server', but got {lmdeploy_config.deploy_method}"
+            assert lmdeploy_config.deploy_method in ['local', 'serve'], f"deploy_method must be 'local' or 'serve', but got {lmdeploy_config.deploy_method}"
             if lmdeploy_config.deploy_method == 'local':
                 self.engine = LmdeployLocalEngine(lmdeploy_config)
-            elif lmdeploy_config.deploy_method == 'server':
-                raise NotImplementedError
+            elif lmdeploy_config.deploy_method == 'serve':
+                self.engine = LmdeployServeEngine(lmdeploy_config)
             logger.info("lmdeploy model loaded")
 
     def chat(
