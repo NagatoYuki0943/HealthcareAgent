@@ -316,6 +316,7 @@ class TransfomersEngine(DeployEngine):
 
         def consumer():
             producer = Thread(target=stream_producer)
+            # 启动多线程
             producer.start()
             while True:
                 res = response_queue.get()
@@ -572,6 +573,7 @@ class LmdeployLocalEngine(DeployEngine):
 
         loop = _get_event_loop()
         proc = Thread(target=lambda: loop.run_until_complete(gather()))
+        # 启动多线程
         proc.start()
 
         while True:
@@ -583,6 +585,7 @@ class LmdeployLocalEngine(DeployEngine):
             except Empty:
                 pass
 
+        # 等待子线程执行完毕
         proc.join()
 
     # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py#L453-L528
@@ -643,6 +646,7 @@ class LmdeployLocalEngine(DeployEngine):
 
         loop = _get_event_loop()
         proc = Thread(target=lambda: loop.run_until_complete(gather()))
+        # 启动多线程
         proc.start()
 
         while True:
@@ -654,6 +658,7 @@ class LmdeployLocalEngine(DeployEngine):
             except Empty:
                 pass
 
+        # 等待子线程执行完毕
         proc.join()
 
     # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/gradio/turbomind_coupled.py#L21-L67
