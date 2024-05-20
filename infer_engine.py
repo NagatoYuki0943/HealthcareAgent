@@ -1,16 +1,16 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import Generator, AsyncGenerator, Literal, Sequence, Any
+from typing import Generator, AsyncGenerator, Literal, Sequence
 import torch
 import transformers
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers.generation.streamers import BaseStreamer
-import queue
 from threading import Thread
 from queue import Empty, Queue
 import asyncio
 import random
 from loguru import logger
+from templates import get_prompt_template
 
 
 @dataclass
@@ -19,7 +19,7 @@ class TransformersConfig:
     adapter_path: str = None
     load_in_8bit: bool = False
     load_in_4bit: bool = False
-    model_name: str = 'internlm2'
+    model_name: str = 'internlm2'  # 用于查找对应的对话模板
     system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
     - InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室). It is designed to be helpful, honest, and harmless.
     - InternLM (书生·浦语) can understand and communicate fluently in the language chosen by the user such as English and 中文.
@@ -137,6 +137,7 @@ class DeployEngine(ABC):
 
 class TransfomersEngine(DeployEngine):
     def __init__(self, config: TransformersConfig) -> None:
+        from transformers import BitsAndBytesConfig
         from peft import PeftModel
 
         logger.info(f"torch version: {torch.__version__}")
@@ -180,9 +181,16 @@ class TransfomersEngine(DeployEngine):
 
         self.model.eval()
 
-        # logger.info(model.__class__.__name__) # InternLM2ForCausalLM
-
         logger.info(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
+
+        # 获取对话模板
+        self.prompt_template: dict = get_prompt_template(config.model_name)
+        # 停止词
+        self.stop_words = [self.tokenizer.eos_token] + self.prompt_template.get('STOP_WORDS', [])
+        logger.info(f"stop_words: {self.stop_words}")
+        # 停止id
+        self.stop_ids = self.tokenizer.convert_tokens_to_ids(self.stop_words)
+        logger.info(f"stop_ids: {self.stop_ids}")
 
     # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1136-L1146
     def build_inputs(
@@ -198,11 +206,47 @@ class TransfomersEngine(DeployEngine):
             prompt = ""
         else:
             prompt = tokenizer.bos_token
+        # 系统指令
         if meta_instruction:
             prompt += f"""<|im_start|>system\n{meta_instruction}<|im_end|>\n"""
+        # 历史对话
         for record in history:
+            # 拼接问题和答案
             prompt += f"""<|im_start|>user\n{record[0]}<|im_end|>\n<|im_start|>assistant\n{record[1]}<|im_end|>\n"""
+        # 用户最新的问题
         prompt += f"""<|im_start|>user\n{query}<|im_end|>\n<|im_start|>assistant\n"""
+        return prompt, tokenizer([prompt], return_tensors="pt")
+
+    def build_inputs_advanced(
+        self,
+        tokenizer,
+        query: str,
+        history: list[tuple[str, str]] | None = None, # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        meta_instruction = ""
+    ) -> tuple[str, Sequence]:
+        """支持多个模型的对话模板"""
+        history = [] if history is None else list(history)
+
+        # 对话模板的各个部分
+        system_template = self.prompt_template.get('SYSTEM', '<|System|>:{system}\n')
+        instruction_template = self.prompt_template.get('INSTRUCTION', '<|User|>:{input}\n<|Bot|>:')
+        suffix = self.prompt_template.get('SUFFIX', "")
+        sep = self.prompt_template.get('SEP', '\n')
+
+        if tokenizer.add_bos_token:
+            prompt = ""
+        else:
+            prompt = tokenizer.bos_token
+        # 系统指令
+        if meta_instruction:
+            prompt += system_template.format(system=meta_instruction)
+        # 历史对话
+        for record in history:
+            # 拼接问题和答案
+            prompt += instruction_template.format(input=record[0]) + record[1] + suffix + sep
+        # 用户最新的问题
+        prompt += instruction_template.format(input=query)
+        logger.info(f"prompt_template: \n{prompt}")
         return prompt, tokenizer([prompt], return_tensors="pt")
 
     # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1148-L1182
@@ -223,10 +267,11 @@ class TransfomersEngine(DeployEngine):
         **kwargs,
     ) -> tuple[str, Sequence]:
         history = [] if history is None else list(history)
-        _, inputs = self.build_inputs(tokenizer, query, history, meta_instruction)
+        # _, inputs = self.build_inputs(tokenizer, query, history, meta_instruction)
+        _, inputs = self.build_inputs_advanced(tokenizer, query, history, meta_instruction)
         inputs = {k: v.to(self.model.device) for k, v in inputs.items() if torch.is_tensor(v)}
         # also add end-of-assistant token in eos token id to avoid unnecessary generation
-        eos_token_id = [tokenizer.eos_token_id, tokenizer.convert_tokens_to_ids(["<|im_end|>"])[0]]
+        # eos_token_id = [tokenizer.eos_token_id, tokenizer.convert_tokens_to_ids(["<|im_end|>"])[0]]
         outputs = self.model.generate(
             **inputs,
             streamer=streamer,
@@ -234,7 +279,7 @@ class TransfomersEngine(DeployEngine):
             do_sample=do_sample,
             temperature=temperature,
             top_p=top_p,
-            eos_token_id=eos_token_id,
+            eos_token_id=self.stop_ids, # eos_token_id,
             **kwargs,
         )
         outputs = outputs[0].cpu().tolist()[len(inputs["input_ids"][0]) :]
@@ -264,7 +309,9 @@ class TransfomersEngine(DeployEngine):
         """
         history = [] if history is None else list(history)
 
-        response_queue = queue.Queue(maxsize=20)
+        response_queue = Queue(maxsize=20)
+
+        stop_words = self.stop_words
 
         class ChatStreamer(BaseStreamer):
             def __init__(self, tokenizer) -> None:
@@ -292,7 +339,7 @@ class TransfomersEngine(DeployEngine):
                 self.cache.extend(value.tolist())
                 token = self.tokenizer.decode(self.cache, skip_special_tokens=True)
                 # if token.strip() != "<|im_end|>":
-                if token.strip() != self.tokenizer.eos_token: # <|im_end|> 仅用于 InternLM2,不适用于其他模型,这个改为 eos_token 是为了通用性
+                if token.strip() not in stop_words:
                     self.response = self.response + token
                     history = self.history + [(self.query, self.response)]
                     self.queue.put((self.response, history))
@@ -414,7 +461,7 @@ class TransfomersEngine(DeployEngine):
 class LmdeployEngine(DeployEngine):
     def __init__(self, config: LmdeployConfig) -> None:
         import lmdeploy
-        from lmdeploy import pipeline, PytorchEngineConfig, TurbomindEngineConfig, ChatTemplateConfig, GenerationConfig
+        from lmdeploy import PytorchEngineConfig, TurbomindEngineConfig, ChatTemplateConfig
 
         logger.info(f"lmdeploy version: {lmdeploy.__version__}")
         logger.info(f"lmdeploy config: {config}")
