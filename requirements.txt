@@ -1,4 +1,4 @@
-gradio>4.0.0
+gradio>4.0.0 # 不支持 3.x 版本
 huggingface_hub
 transformers
 peft
@@ -9,14 +9,14 @@ sentencepiece
 einops
 accelerate
 tiktoken
-langchain
-langchain_community
-chromadb
+langchain>=0.2.0 # 指定版本，否则openxlab上会下载全部版本
+langchain-community>=0.2.0 # 指定版本，否则openxlab上会下载全部版本
+chromadb>=0.5.0 # 指定版本，否则openxlab上会下载全部版本
 pysqlite3-binary
 faiss-cpu
 pypdf
-unstructured # txt,md,doc,docx
+unstructured>=0.14.0 # txt,md,doc,docx # 指定版本，否则openxlab上会下载全部版本
 python-docx # doc,docx
 lmdeploy
-openxlab>=0.0.38
+openxlab
 loguru
