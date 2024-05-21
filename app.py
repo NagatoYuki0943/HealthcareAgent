@@ -38,14 +38,12 @@ print(f"hf_token = {hf_token}")
 snapshot_download(
     repo_id = "maidalun1020/bce-embedding-base_v1",
     local_dir = EMBEDDING_MODEL_PATH,
-    resume_download = True,
     max_workers = 8,
     token = hf_token
 )
 snapshot_download(
     repo_id = "maidalun1020/bce-reranker-base_v1",
     local_dir = RERANKER_MODEL_PATH,
-    resume_download = True,
     max_workers = 8,
     token = hf_token
 )

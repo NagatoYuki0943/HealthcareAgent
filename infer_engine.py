@@ -11,6 +11,7 @@ import asyncio
 import random
 from loguru import logger
 from templates import get_prompt_template
+from utils import random_uuid_int
 
 
 @dataclass
@@ -246,7 +247,7 @@ class TransfomersEngine(DeployEngine):
             prompt += instruction_template.format(input=record[0]) + record[1] + suffix + sep
         # 用户最新的问题
         prompt += instruction_template.format(input=query)
-        logger.info(f"prompt_template: \n{prompt}")
+        # logger.info(f"prompt_template: \n{prompt}")
         return prompt, tokenizer([prompt], return_tensors="pt")
 
     # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1148-L1182
@@ -479,27 +480,32 @@ class LmdeployEngine(DeployEngine):
         if config.backend == 'turbomind':
             # 可以直接使用transformers的模型,会自动转换格式
             # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#turbomindengineconfig
+            # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
             self.backend_config = TurbomindEngineConfig(
                 model_name = config.model_name,
                 model_format = config.model_format, # The format of input model. `hf` meaning `hf_llama`, `llama` meaning `meta_llama`, `awq` meaning the quantized model by awq. Default: None. Type: str
                 tp = 1,
-                session_len = 8192,
+                session_len = None,                 # the max session length of a sequence, default to None
                 max_batch_size = 128,
                 cache_max_entry_count = config.cache_max_entry_count,
                 cache_block_seq_len = 64,
+                enable_prefix_caching = False,
                 quant_policy = config.quant_policy, # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
                 rope_scaling_factor = 0.0,
                 use_logn_attn = False,
                 download_dir = None,
                 revision = None,
                 max_prefill_token_num = 8192,
+                num_tokens_per_iter = 0,
+                max_prefill_iters = 1,
             )
         else:
             # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#pytorchengineconfig
+            # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
             self.backend_config = PytorchEngineConfig(
                 model_name = config.model_name,
                 tp = 1,
-                session_len = 8192,
+                session_len = None,                 # the max session length of a sequence, default to None
                 max_batch_size = 128,
                 cache_max_entry_count = config.cache_max_entry_count,
                 eviction_type = 'recompute',
@@ -508,8 +514,9 @@ class LmdeployEngine(DeployEngine):
                 num_cpu_blocks = 0,
                 num_gpu_blocks = 0,
                 adapters = None,
-                max_prefill_token_num = 8192,
+                max_prefill_token_num = 4096,
                 thread_safe = False,
+                enable_prefix_caching = False,
                 download_dir = None,
                 revision = None,
             )
@@ -520,6 +527,14 @@ class LmdeployEngine(DeployEngine):
             model_name = config.model_name, # All the chat template names: `lmdeploy list`
             system = None,
             meta_instruction = config.system_prompt,
+            eosys = None,
+            user = None,
+            eoh = None,
+            assistant = None,
+            eoa = None,
+            separator = None,
+            capability = None,
+            stop_words = None,
         )
         logger.info(f"lmdeploy chat_template_config: {self.chat_template_config}")
 
@@ -528,7 +543,7 @@ class LmdeployLocalEngine(LmdeployEngine):
     def __init__(self, config: LmdeployConfig) -> None:
         super().__init__(config)
 
-        from lmdeploy import pipeline, GenerationConfig
+        from lmdeploy import pipeline
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
@@ -539,22 +554,6 @@ class LmdeployLocalEngine(LmdeployEngine):
             backend_config = self.backend_config,
             chat_template_config = self.chat_template_config,
             log_level = config.log_level
-        )
-
-        # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
-        self.gen_config = GenerationConfig(
-            n = 1,
-            max_new_tokens = 1024,
-            top_p = 0.8,
-            top_k = 40,
-            temperature = 0.8,
-            repetition_penalty = 1.0,
-            ignore_eos = False,
-            random_seed = None,
-            stop_words = None,
-            bad_words = None,
-            min_new_tokens = None,
-            skip_special_tokens = True,
         )
 
     # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py#L453-L528
@@ -785,6 +784,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         session_id: int | None = None,
         **kwargs,
     ) -> tuple[str, Sequence]:
+        from lmdeploy import GenerationConfig
         from lmdeploy.messages import Response
 
         # session_id
@@ -793,12 +793,24 @@ class LmdeployLocalEngine(LmdeployEngine):
         # 将历史记录转换为openai格式
         prompt = convert_history(query, history)
 
-        # 更新生成config
-        self.gen_config.max_new_tokens = max_new_tokens
-        self.gen_config.top_p = top_p
-        self.gen_config.top_k = top_k
-        self.gen_config.temperature = temperature
-        logger.info(f"gen_config: {self.gen_config}")
+        # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
+        gen_config = GenerationConfig(
+            n = 1,
+            max_new_tokens = max_new_tokens,
+            top_p = top_p,
+            top_k = top_k,
+            temperature = temperature,
+            repetition_penalty = 1.0,
+            ignore_eos = False,
+            random_seed = None,
+            stop_words = None,
+            bad_words = None,
+            min_new_tokens = None,
+            skip_special_tokens = True,
+            logprobs = None,
+        )
+        logger.info(f"gen_config: {gen_config}")
 
         logger.info(f"query: {query}")
         # 放入 [{},{}] 格式返回一个response
@@ -806,7 +818,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         response: Response
         response = self.pipe(
             prompts = prompt,
-            gen_config = self.gen_config,
+            gen_config = gen_config,
             do_preprocess = True,
             adapter_name = None
         )
@@ -829,21 +841,34 @@ class LmdeployLocalEngine(LmdeployEngine):
         session_id: int | None = None,
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
+        from lmdeploy import GenerationConfig
         from lmdeploy.messages import Response
 
         # session_id
-        session_id = random.randint(1, 1e9) if session_id is None else session_id
+        session_id = random_uuid_int() if session_id is None else session_id
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
         prompt = convert_history(query, history)
 
-        # 更新生成config
-        self.gen_config.max_new_tokens = max_new_tokens
-        self.gen_config.top_p = top_p
-        self.gen_config.top_k = top_k
-        self.gen_config.temperature = temperature
-        logger.info(f"gen_config: {self.gen_config}")
+        # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
+        gen_config = GenerationConfig(
+            n = 1,
+            max_new_tokens = max_new_tokens,
+            top_p = top_p,
+            top_k = top_k,
+            temperature = temperature,
+            repetition_penalty = 1.0,
+            ignore_eos = False,
+            random_seed = None,
+            stop_words = None,
+            bad_words = None,
+            min_new_tokens = None,
+            skip_special_tokens = True,
+            logprobs = None,
+        )
+        logger.info(f"gen_config: {gen_config}")
 
         logger.info(f"query: {query}")
         response_text = ""
@@ -855,7 +880,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         # async for response in self.chat_stream_local(
             prompt = prompt,
             session_id = session_id,
-            gen_config = self.gen_config,
+            gen_config = gen_config,
             do_preprocess = True,
             adapter_name = None
         ):
@@ -917,7 +942,7 @@ class LmdeployServeEngine(LmdeployEngine):
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
         # session_id
-        session_id = random.randint(1, 1e9) if session_id is None else session_id
+        session_id = random_uuid_int() if session_id is None else session_id
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
