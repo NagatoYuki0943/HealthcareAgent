@@ -742,9 +742,8 @@ class LmdeployLocalEngine(LmdeployEngine):
             adapter_name (str): the adapter name of slora for pytorch backend.
                 Pick one from adapters. Default to None, using the base model.
         """
-        from lmdeploy.messages import GenerationConfig
+        from lmdeploy.messages import GenerationConfig, Response
         from lmdeploy.serve.async_engine import GenOut
-        from lmdeploy.messages import Response
 
         if gen_config is None:
             gen_config = GenerationConfig()
@@ -784,8 +783,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         session_id: int | None = None,
         **kwargs,
     ) -> tuple[str, Sequence]:
-        from lmdeploy import GenerationConfig
-        from lmdeploy.messages import Response
+        from lmdeploy.messages import GenerationConfig, Response
 
         # session_id
         logger.info(f"{session_id = }")
@@ -841,8 +839,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         session_id: int | None = None,
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
-        from lmdeploy import GenerationConfig
-        from lmdeploy.messages import Response
+        from lmdeploy.messages import GenerationConfig, Response
 
         # session_id
         session_id = random_uuid_int() if session_id is None else session_id
