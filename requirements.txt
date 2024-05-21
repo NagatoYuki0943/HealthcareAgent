@@ -1,7 +1,7 @@
 # 注意: 这里大多第三方库都指定了版本,但实际上不需要版本对应也可以使用,版本对应的原因是不指定版本的话在openxlab上构建应用时间会边长
 gradio>4.0.0
 huggingface_hub==0.23
-transformers==4.36.2
+transformers==4.41.0
 peft==0.9.0
 sentence-transformers==2.7.0
 bcembedding==0.1.5
