@@ -17,7 +17,6 @@ hf_token = ""
 snapshot_download(
     repo_id = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
     local_dir = "./models/paraphrase-multilingual-MiniLM-L12-v2",
-    resume_download = True,
     # proxies = proxies,
     max_workers = 8,
     # endpoint = endpoint,
@@ -26,7 +25,6 @@ snapshot_download(
 snapshot_download(
     repo_id = "maidalun1020/bce-embedding-base_v1",
     local_dir = "./models/bce-embedding-base_v1",
-    resume_download = True,
     # proxies = proxies,
     max_workers = 8,
     # endpoint = endpoint,
@@ -36,7 +34,6 @@ snapshot_download(
 snapshot_download(
     repo_id = "maidalun1020/bce-reranker-base_v1",
     local_dir = "./models/bce-reranker-base_v1",
-    resume_download = True,
     # proxies = proxies,
     max_workers = 8,
     # endpoint = endpoint,
@@ -46,7 +43,6 @@ snapshot_download(
 # snapshot_download(
 #     repo_id = "internlm/internlm2-chat-1_8b",
 #     local_dir = "./models/internlm2-chat-1_8b",
-#     resume_download = True,
 #     # proxies = proxies,
 #     max_workers = 8,
 #     # endpoint = endpoint,
