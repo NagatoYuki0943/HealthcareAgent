@@ -69,9 +69,6 @@ vector_database.load_faiss_vectordb()
 # 创建重排序 retriever
 vector_database.create_faiss_reranker_retriever()
 
-# 查看GPU使用情况
-os.system("nvidia-smi")
-
 # clone 模型
 MODEL_PATH = './models/internlm2-chat-7b'
 os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b {MODEL_PATH}')
@@ -98,7 +95,7 @@ LMDEPLOY_CONFIG = LmdeployConfig(
     model_path = MODEL_PATH,
     backend = 'turbomind',
     model_format = 'hf',
-    cache_max_entry_count = 0.5,    # 调整 KV Cache 的占用比例为0.5
+    cache_max_entry_count = 0.2,    # 调整 KV Cache 的占用比例为0.2
     quant_policy = 0,               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     model_name = 'internlm2',
     system_prompt = SYSTEM_PROMPT,
@@ -163,8 +160,6 @@ def chat(
     yield history + [[query, response + references_str]]
     logger.info(f"references_str: {references_str}")
     logger.info(f"history_without_rag: {history + [[query, response + references_str]]}")
-    # 查看GPU使用情况
-    os.system("nvidia-smi")
 
 
 def regenerate(
