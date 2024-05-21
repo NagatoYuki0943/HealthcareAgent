@@ -69,6 +69,9 @@ vector_database.load_faiss_vectordb()
 # 创建重排序 retriever
 vector_database.create_faiss_reranker_retriever()
 
+# 查看GPU使用情况
+os.system("nvidia-smi")
+
 # clone 模型
 MODEL_PATH = './models/internlm2-chat-7b'
 os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b {MODEL_PATH}')
