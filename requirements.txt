@@ -9,8 +9,8 @@ sentencepiece
 einops
 accelerate
 tiktoken
-langchain>=0.2.0 # 指定版本，否则openxlab上会下载全部版本
-langchain-community>=0.2.0 # 指定版本，否则openxlab上会下载全部版本
+langchain==0.1.20 # 指定版本，否则openxlab上会下载全部版本
+langchain-community==0.0.38 # 指定版本，否则openxlab上会下载全部版本
 chromadb>=0.5.0 # 指定版本，否则openxlab上会下载全部版本
 pysqlite3-binary
 faiss-cpu
