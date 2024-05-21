@@ -1,23 +1,22 @@
-# 注意: 这里大多第三方库都指定了版本,但实际上不需要版本对应也可以使用,版本对应的原因是不指定版本的话在openxlab上构建应用时间会边长
 gradio>4.0.0
-huggingface_hub==0.23
-transformers==4.36.2
-peft==0.9.0
-sentence-transformers==2.7.0
-bcembedding==0.1.5
-bitsandbytes==0.43.1
-sentencepiece==0.2.0
-einops==0.8.0
-accelerate==0.30.1
-tiktoken==0.7.0
-langchain==0.2.0
-langchain_community==0.2.0
-chromadb==0.5.0
-pysqlite3-binary==0.5.2.post3
-faiss-cpu==1.8.0
-pypdf==4.2.0
-unstructured==0.14.0 # txt,md,doc,docx
-python-docx==1.1.2 # doc,docx
-lmdeploy==0.4.0
-openxlab==0.0.38
-loguru==0.7.2
+huggingface_hub
+transformers
+peft
+sentence-transformers
+bcembedding
+bitsandbytes
+sentencepiece
+einops
+accelerate
+tiktoken
+langchain
+langchain_community
+chromadb
+pysqlite3-binary
+faiss-cpu
+pypdf
+unstructured # txt,md,doc,docx
+python-docx # doc,docx
+lmdeploy
+openxlab>=0.0.38
+loguru
