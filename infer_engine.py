@@ -31,16 +31,19 @@ class TransformersConfig:
 class LmdeployConfig:
     model_path: str
     backend: Literal['turbomind', 'pytorch'] = 'turbomind'
+    model_name: str = 'internlm2'
     model_format: Literal['hf', 'llama', 'awq'] = 'hf'
+    tp: int = 1,                        # Tensor Parallelism.
+    max_batch_size: int = 128,
     cache_max_entry_count: float = 0.8  # 调整 KV Cache 的占用比例为0.8
     quant_policy: int = 0               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
-    model_name: str = 'internlm2'
     system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
     - InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室). It is designed to be helpful, honest, and harmless.
     - InternLM (书生·浦语) can understand and communicate fluently in the language chosen by the user such as English and 中文.
     """
     log_level: Literal['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'] = 'ERROR'
     deploy_method: Literal['local', 'serve'] = 'local'
+    # for server
     server_name: str = '0.0.0.0'
     server_port: int = 23333
     api_keys: list[str] | str | None = None
@@ -484,9 +487,9 @@ class LmdeployEngine(DeployEngine):
             self.backend_config = TurbomindEngineConfig(
                 model_name = config.model_name,
                 model_format = config.model_format, # The format of input model. `hf` meaning `hf_llama`, `llama` meaning `meta_llama`, `awq` meaning the quantized model by awq. Default: None. Type: str
-                tp = 1,
+                tp = config.tp,                     # Tensor Parallelism.
                 session_len = None,                 # the max session length of a sequence, default to None
-                max_batch_size = 128,
+                max_batch_size = config.max_batch_size,
                 cache_max_entry_count = config.cache_max_entry_count,
                 cache_block_seq_len = 64,
                 enable_prefix_caching = False,
@@ -504,9 +507,9 @@ class LmdeployEngine(DeployEngine):
             # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
             self.backend_config = PytorchEngineConfig(
                 model_name = config.model_name,
-                tp = 1,
+                tp = config.tp,                     # Tensor Parallelism.
                 session_len = None,                 # the max session length of a sequence, default to None
-                max_batch_size = 128,
+                max_batch_size = config.max_batch_size,
                 cache_max_entry_count = config.cache_max_entry_count,
                 eviction_type = 'recompute',
                 prefill_interval = 16,
@@ -1059,7 +1062,7 @@ class InferEngine(DeployEngine):
         session_id: int | None = None,
         **kwargs,
     ) -> tuple[str, Sequence]:
-        """对话
+        """一次返回完整回答
 
         Args:
             query (str): 问题
@@ -1097,7 +1100,7 @@ class InferEngine(DeployEngine):
         session_id: int | None = None,
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
-        """流式返回对话
+        """流式返回回答
 
         Args:
             query (str): 问题
