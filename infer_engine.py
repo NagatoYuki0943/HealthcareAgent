@@ -33,8 +33,8 @@ class LmdeployConfig:
     backend: Literal['turbomind', 'pytorch'] = 'turbomind'
     model_name: str = 'internlm2'
     model_format: Literal['hf', 'llama', 'awq'] = 'hf'
-    tp: int = 1,                        # Tensor Parallelism.
-    max_batch_size: int = 128,
+    tp: int = 1                         # Tensor Parallelism.
+    max_batch_size: int = 128
     cache_max_entry_count: float = 0.8  # 调整 KV Cache 的占用比例为0.8
     quant_policy: int = 0               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     system_prompt: str = """You are an AI assistant whose name is InternLM (书生·浦语).
