@@ -817,12 +817,13 @@ class LmdeployLocalEngine(LmdeployEngine):
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
         response: Response
-        response = self.pipe(
-            prompts = prompt,
+        # response = self.pipe(
+        response = self.pipe.chat(
+            prompt = prompt,
             gen_config = gen_config,
             do_preprocess = True,
             adapter_name = None
-        )
+        ).response
         logger.info(f"response: {response}")
         response_text = response.text
         logger.info(f"response_text: {response_text}")
