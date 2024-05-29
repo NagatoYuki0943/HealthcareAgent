@@ -50,7 +50,15 @@ class LmdeployConfig:
     ssl: bool = False
 
 
-def convert_history(
+@dataclass
+class ApiConfig:
+    base_url: str = 'https://api.moonshot.cn/v1'
+    api_key: str | None = None
+    model: str = 'moonshot-v1-8k'
+    system_prompt: str = "You are a helpful, respectful and honest assistant."
+
+
+def convert_to_openai_history(
     query: str,
     history: Sequence
 ) -> list:
@@ -792,7 +800,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = convert_history(query, history)
+        prompt = convert_to_openai_history(query, history)
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
@@ -850,7 +858,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = convert_history(query, history)
+        prompt = convert_to_openai_history(query, history)
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
@@ -947,7 +955,7 @@ class LmdeployServeEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = convert_history(query, history)
+        prompt = convert_to_openai_history(query, history)
 
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
@@ -1029,20 +1037,214 @@ class LmdeployServeEngine(LmdeployEngine):
         )
 
 
+class ApiEngine(DeployEngine):
+    def __init__(self, config: ApiConfig) -> None:
+        from openai import OpenAI
+
+        self.config = config
+
+        self.client = OpenAI(
+            api_key = config.api_key,
+            base_url = config.base_url
+        )
+
+    def get_available_models(self) -> list[str]:
+        """获取可用模型列表"""
+        try:
+            models = self.client.models.list()
+            model_ids = [model.id for model in models]
+            return model_ids
+        except:
+            logger.error(f"get_available_models error")
+            return []
+
+    def chat(
+        self,
+        query: str,
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        max_new_tokens: int = 1024,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        top_k: int = 40,
+        session_id: int | None = None,
+        model: str | None = None,
+        **kwargs,
+    ) -> tuple[str, Sequence]:
+        from openai.types.chat.chat_completion import ChatCompletion
+
+        # session_id
+        logger.info(f"{session_id = }")
+
+        # 将历史记录转换为openai格式
+        prompt = [
+            {
+                "role": "system",
+                "content": self.config.system_prompt
+            },
+        ] + convert_to_openai_history(query, history)
+        logger.info(f"prompt: {prompt}")
+
+        logger.info("gen_config: {}".format({
+            "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+        }))
+
+        model = self.config.model if model is None else model
+        logger.info(f"use model: {model}")
+        logger.info(f"query: {query}")
+
+        try:
+            completion: ChatCompletion = self.client.chat.completions.create(
+                messages = prompt,
+                model = model,
+                max_tokens = max_new_tokens,
+                n = 1,                      # 为每条输入消息生成多少个结果，默认为 1
+                presence_penalty = 0.0,     # 存在惩罚，介于-2.0到2.0之间的数字。正值会根据新生成的词汇是否出现在文本中来进行惩罚，增加模型讨论新话题的可能性
+                frequency_penalty = 0.0,    # 频率惩罚，介于-2.0到2.0之间的数字。正值会根据新生成的词汇在文本中现有的频率来进行惩罚，减少模型一字不差重复同样话语的可能性
+                stream = False,
+                temperature = temperature,
+                top_p = top_p,
+            )
+            logger.info(f"completion: {completion}")
+            # ChatCompletion(
+            #   id='chatcmpl-58bb944e97cf46a88ca3d55376d7669d',
+            #   choices=[
+            #       Choice(
+            #           finish_reason='stop',
+            #           index=0,
+            #           logprobs=None,
+            #           message=ChatCompletionMessage(
+            #               content='你好！我是你的人工智能助手，我在这里为你提供帮助和信息。有什么我可以帮你的吗？',
+            #               role='assistant',
+            #               function_call=None,
+            #               tool_calls=None
+            #           )
+            #      )
+            #   ],
+            #   created=1716986320,
+            #   model='moonshot-v1-8k',
+            #   object='chat.completion',
+            #   system_fingerprint=None,
+            #   usage=CompletionUsage(completion_tokens=22, prompt_tokens=24, total_tokens=46)
+            # )
+
+            response: str = completion.choices[0].message.content
+            logger.info(f"response: {response}")
+            history.append([query, response])
+            logger.info(f"history: {history}")
+            return response, history
+
+        except:
+            error_str = "chat error"
+            logger.error(error_str)
+            return error_str, history + [query, error_str]
+
+    def chat_stream(
+        self,
+        query: str,
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        max_new_tokens: int = 1024,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        top_k: int = 40,
+        session_id: int | None = None,
+        model: str | None = None,
+        **kwargs,
+    ) -> Generator[tuple[str, Sequence], None, None]:
+        from openai.types.chat.chat_completion import ChatCompletion
+
+        # session_id
+        logger.info(f"{session_id = }")
+
+        # 将历史记录转换为openai格式
+        prompt = [
+            {
+                "role": "system",
+                "content": self.config.system_prompt
+            },
+        ] + convert_to_openai_history(query, history)
+        logger.info(f"prompt: {prompt}")
+
+        logger.info("gen_config: {}".format({
+            "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+        }))
+
+        model = self.config.model if model is None else model
+        logger.info(f"use model: {model}")
+        logger.info(f"query: {query}")
+
+        try:
+            completion: ChatCompletion = self.client.chat.completions.create(
+                messages = prompt,
+                model = model,
+                max_tokens = max_new_tokens,
+                n = 1,                      # 为每条输入消息生成多少个结果，默认为 1
+                presence_penalty = 0.0,     # 存在惩罚，介于-2.0到2.0之间的数字。正值会根据新生成的词汇是否出现在文本中来进行惩罚，增加模型讨论新话题的可能性
+                frequency_penalty = 0.0,    # 频率惩罚，介于-2.0到2.0之间的数字。正值会根据新生成的词汇在文本中现有的频率来进行惩罚，减少模型一字不差重复同样话语的可能性
+                stream = True,
+                temperature = temperature,
+                top_p = top_p,
+            )
+
+            response_text = ""
+            for chunk in completion:
+                # ChatCompletionChunk(
+                #   id='chatcmpl-02ab3417a31449398bd950e1a8cf12a1',
+                #   choices=[
+                #       Choice(
+                #           delta=ChoiceDelta(
+                #               content='维生素',
+                #               function_call=None,
+                #               role=None,
+                #               tool_calls=None
+                #           ),
+                #           finish_reason=None,
+                #           index=0,
+                #           logprobs=None
+                #       )
+                #   ],
+                #   created=1716985805,
+                #   model='moonshot-v1-8k',
+                #   object='chat.completion.chunk',
+                #   system_fingerprint=None,
+                #   usage=None
+                # )
+                logger.info(f"response: {chunk}")
+                chunk_message = chunk.choices[0].delta
+                if not chunk_message.content:
+                    continue
+                response_text += chunk_message.content
+                yield response_text, history + [[query, response_text]]
+
+            logger.info(f"response_text: {response_text}")
+            logger.info(f"history: {history + [[query, response_text]]}")
+
+        except:
+            error_str = "chat error"
+            logger.error(error_str)
+            yield error_str, history + [query, error_str]
+
+
 class InferEngine(DeployEngine):
     def __init__(
         self,
-        backend: Literal['transformers', 'lmdeploy'] = 'transformers',
+        backend: Literal['transformers', 'lmdeploy', 'api'] = 'transformers',
         transformers_config: TransformersConfig = None,
         lmdeploy_config: LmdeployConfig = None,
+        api_config: ApiConfig = None,
     ) -> None:
-        assert backend in ['transformers', 'lmdeploy'], f"backend must be 'transformers' or 'lmdeploy', but got {backend}"
+        assert backend in ['transformers', 'lmdeploy', 'api'], f"backend must be 'transformers' or 'lmdeploy', but got {backend}"
         self.backend = backend
 
         if backend == 'transformers':
             assert transformers_config is not None, "transformers_config must not be None when backend is 'transformers'"
             self.engine = TransfomersEngine(transformers_config)
-            logger.info("transformers model loaded")
+            logger.info("transformers model loaded!")
         elif backend == 'lmdeploy':
             assert lmdeploy_config is not None, "lmdeploy_config must not be None when backend is 'lmdeploy'"
             assert lmdeploy_config.deploy_method in ['local', 'serve'], f"deploy_method must be 'local' or 'serve', but got {lmdeploy_config.deploy_method}"
@@ -1050,7 +1252,11 @@ class InferEngine(DeployEngine):
                 self.engine = LmdeployLocalEngine(lmdeploy_config)
             elif lmdeploy_config.deploy_method == 'serve':
                 self.engine = LmdeployServeEngine(lmdeploy_config)
-            logger.info("lmdeploy model loaded")
+            logger.info("lmdeploy model loaded!")
+        elif backend == 'api':
+            assert api_config is not None, "api_config must not be None when backend is 'api'"
+            self.engine = ApiEngine(api_config)
+            logger.info("api model loaded!")
 
     def chat(
         self,
@@ -1127,3 +1333,9 @@ class InferEngine(DeployEngine):
             session_id = session_id,
             **kwargs
         )
+
+    def get_available_models(self) -> list[str] | str:
+        if self.backend == 'api':
+            return self.engine.get_available_models()
+        else:
+            return "当前后端不支持获取可用模型列表"
