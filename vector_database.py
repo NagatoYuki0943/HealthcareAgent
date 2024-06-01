@@ -120,7 +120,7 @@ class VectorDatabase:
 
         from langchain_community.vectorstores import FAISS
 
-        file_lst = self.get_files(self.target_dir)
+        file_lst = self.get_files(self.data_path)
 
         # 加载目标文件
         docs = self.get_text(file_lst)
