@@ -1137,7 +1137,7 @@ class ApiEngine(DeployEngine):
             return response, history
 
         except:
-            error_str = "chat error"
+            error_str = "对不起，无法回答您的问题，请尝试更换提问方式或者换个问题。"
             logger.error(error_str)
             return error_str, history + [query, error_str]
 
@@ -1225,7 +1225,7 @@ class ApiEngine(DeployEngine):
             logger.info(f"history: {history + [[query, response_text]]}")
 
         except:
-            error_str = "chat error"
+            error_str = "对不起，无法回答您的问题，请尝试更换提问方式或者换个问题。"
             logger.error(error_str)
             yield error_str, history + [query, error_str]
 

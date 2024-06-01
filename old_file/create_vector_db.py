@@ -19,20 +19,17 @@ def get_files(dir_path: str) -> list:
     for filepath, dirnames, filenames in os.walk(dir_path):
         # os.walk 函数将递归遍历指定文件夹
         for filename in filenames:
-            # 只读取pdf
-            if filename.endswith(".pdf"):
-                file_list.append(os.path.join(filepath, filename))
             # 通过后缀名判断文件类型是否满足要求
-            # if filename.endswith((".txt", ".md", ".docx", ".doc", ".pdf")):
-            #     file_list.append(os.path.join(filepath, filename))
+            if filename.endswith((".txt", ".md", ".docx", ".doc", ".pdf")):
+                # 忽略 readme.md
+                # if filename.lower() == 'readme.md':
+                #     continue
+                file_list.append(os.path.join(filepath, filename))
     return file_list
 
 
 # 加载文件函数
-def get_text(dir_path: str) -> list:
-    # args：dir_path，目标文件夹路径
-    # 首先调用上文定义的函数得到目标文件路径列表
-    file_lst = get_files(dir_path)
+def get_text(file_lst: list) -> list:
     # docs 存放加载之后的纯文本对象
     docs = []
     # 遍历所有目标文件
@@ -69,19 +66,14 @@ def create_chroma_vectordb(
 
     from langchain_community.vectorstores import Chroma
 
-    dirs = os.listdir(tar_dirs)
-    dirs = [os.path.join(tar_dirs, dir) for dir in dirs]
-    dirs = [dir for dir in dirs if os.path.isdir(dir)]
+    file_lst = get_files(tar_dirs)
 
-    # 加载目标文件
-    docs = []
-    for dir_path in dirs:
-        docs.extend(get_text(dir_path))
+    docs = get_text(file_lst)
 
     # 对文本进行分块
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size = 500,
-        chunk_overlap = 150
+        chunk_size = 768,
+        chunk_overlap = 32,
     )
     split_docs = text_splitter.split_documents(docs)
 
@@ -156,19 +148,14 @@ def create_faiss_vectordb(
 
     from langchain_community.vectorstores import FAISS
 
-    dirs = os.listdir(tar_dirs)
-    dirs = [os.path.join(tar_dirs, dir) for dir in dirs]
-    dirs = [dir for dir in dirs if os.path.isdir(dir)]
+    file_lst = get_files(tar_dirs)
 
-    # 加载目标文件
-    docs = []
-    for dir_path in dirs:
-        docs.extend(get_text(dir_path))
+    docs = get_text(file_lst)
 
     # 对文本进行分块
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size = 500,
-        chunk_overlap = 150
+        chunk_size = 768,
+        chunk_overlap = 32,
     )
     split_docs = text_splitter.split_documents(docs)
 
@@ -235,7 +222,7 @@ def similarity_search(
     query: str,
 ) -> tuple[str, str]:
     # similarity search
-    documents = retriever.get_relevant_documents(query)
+    documents = retriever.invoke(query)
     documents_str = "\n".join([doc.page_content for doc in documents])
     # 获取参考文档并去重
     references = list(set([get_filename(doc.metadata['source']) for doc in documents]))

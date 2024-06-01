@@ -1,6 +1,6 @@
 # 导入必要的库
 import gradio as gr
-from load_chain import load_chain
+from old_file.load_chain import load_chain
 
 
 class ModelCenter():

@@ -15,7 +15,7 @@ chromadb>=0.5.0 # 指定版本，否则openxlab上会下载全部版本
 pysqlite3-binary
 faiss-cpu
 pypdf
-unstructured>=0.14.0 # txt,md,doc,docx # 指定版本，否则openxlab上会下载全部版本
+unstructured>=0.14.3 # txt,md,doc,docx # 指定版本，否则openxlab上会下载全部版本
 python-docx # doc,docx
 lmdeploy
 openxlab>=0.0.38 # 不兼容openxlab默认版本

@@ -57,18 +57,16 @@ def remove_history_references(history: list) -> list:
 
 
 def download_dataset(
-    dataset_repo='NagatoYuki0943/FMdocs',
-    target_path='./data/'
+    dataset_repo: str = 'NagatoYuki0943/FMdocs',
+    target_path: str = './data/',
+    access_key: str | None = None,
+    secret_key: str | None = None
 ):
     import os
     import openxlab
     from openxlab.dataset import get
 
     print("start download dataset")
-    access_key = os.getenv("OPENXLAB_AK", "")
-    secret_key = os.getenv("OPENXLAB_SK", "")
-    print(f"access_key = {access_key}")
-    print(f"secret_key = {secret_key}")
     openxlab.login(ak=access_key, sk=secret_key)
     get(dataset_repo=dataset_repo, target_path=target_path) # 数据集下载
     print("finish download dataset")

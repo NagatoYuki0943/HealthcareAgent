@@ -6,7 +6,7 @@
 
 import os
 from infer_engine import InferEngine, LmdeployConfig
-from database import VectorDatabase
+from vector_database import VectorDatabase
 import gradio as gr
 from typing import Generator, Sequence
 import threading
@@ -24,17 +24,33 @@ os.system("pip list")
 print("*" * 100)
 
 
-DATA_PATH = "./data"
-EMBEDDING_MODEL_PATH = "./models/bce-embedding-base_v1"
-RERANKER_MODEL_PATH : str = "./models/bce-reranker-base_v1"
-PERSIST_DIRECTORY = "./vector_db/faiss"
-SIMILARITY_TOP_K = 7
-SCORE_THRESHOLD = 0.15
-ALLOW_SUFFIX = (".pdf")
+"""
+设置临时变量
+
+linux:
+    export HF_TOKEN="your token"
+
+powershell:
+    $env:HF_TOKEN = "your token"
+
+"""
+# 获取环境变量
+hf_token = os.getenv("HF_TOKEN", "")
+access_key = os.getenv("OPENXLAB_AK", "")
+secret_key = os.getenv("OPENXLAB_SK", "")
+print(f"hf_token = {hf_token}")
+print(f"access_key = {access_key}")
+print(f"secret_key = {secret_key}")
+
+DATA_PATH: str = "./data"
+EMBEDDING_MODEL_PATH: str = "./models/bce-embedding-base_v1"
+RERANKER_MODEL_PATH: str = "./models/bce-reranker-base_v1"
+PERSIST_DIRECTORY: str = "./vector_db/faiss"
+SIMILARITY_TOP_K: int = 5
+SCORE_THRESHOLD: float = 0.15
+ALLOW_SUFFIX: tuple[str] = (".txt", ".md", ".docx", ".doc", ".pdf")
 
 # 下载 embedding 和 reranker 模型,不会重复下载
-hf_token = os.getenv("HF_TOKEN", "")
-print(f"hf_token = {hf_token}")
 snapshot_download(
     repo_id = "maidalun1020/bce-embedding-base_v1",
     local_dir = EMBEDDING_MODEL_PATH,
@@ -49,8 +65,14 @@ snapshot_download(
 )
 
 # 下载数据集,不会重复下载
-download_dataset(target_path = DATA_PATH)
+download_dataset(
+    dataset_repo = 'NagatoYuki0943/FMdocs',
+    target_path = DATA_PATH,
+    access_key = access_key,
+    secret_key = secret_key
+)
 
+# 向量数据库
 vector_database = VectorDatabase(
     data_path = DATA_PATH,
     embedding_model_path = EMBEDDING_MODEL_PATH,
@@ -64,11 +86,14 @@ vector_database = VectorDatabase(
 vector_database.create_faiss_vectordb(force=True)
 # 载入数据库(创建数据库后不需要载入也可以)
 vector_database.load_faiss_vectordb()
+# 创建相似度 retriever
+# vector_database.create_faiss_retriever()
 # 创建重排序 retriever
 vector_database.create_faiss_reranker_retriever()
 
-# clone 模型
-MODEL_PATH = './models/internlm2-chat-7b'
+
+# 模型
+MODEL_PATH = "./models/internlm2-chat-7b"
 os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b {MODEL_PATH}')
 os.system(f'cd {MODEL_PATH} && git lfs pull')
 
@@ -87,7 +112,6 @@ TEMPLATE = """上下文:
 <question>{question}</question>
 请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理(除非用户指定了回答的语言，否则用户使用什么语言就用什么语言回答):"""
 # 请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理:"""
-
 
 LMDEPLOY_CONFIG = LmdeployConfig(
     model_path = MODEL_PATH,

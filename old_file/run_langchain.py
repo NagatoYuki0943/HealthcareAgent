@@ -1,5 +1,5 @@
 # 导入必要的库
-from load_chain import load_chain
+from old_file.load_chain import load_chain
 
 
 class ModelCenter():

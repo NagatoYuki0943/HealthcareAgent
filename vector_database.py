@@ -20,7 +20,7 @@ class VectorDatabase:
         embedding_model_path: str = "./models/bce-embedding-base_v1",
         reranker_model_path : str | None = "./models/bce-reranker-base_v1",
         persist_directory: str = "./vector_db/faiss",
-        similarity_top_k: int = 7,
+        similarity_top_k: int = 5,
         score_threshold: float = 0.15,
         allow_suffix: tuple[str] | str = (".txt", ".md", ".docx", ".doc", ".pdf"),
     ):
@@ -30,7 +30,7 @@ class VectorDatabase:
             embedding_model_path (str, optional): embedding 模型路径. Defaults to "./models/bce-embedding-base_v1".
             reranker_model_path (str | None, optional): embedding 模型路径,可以为空,使用 rerank 必须提供. Defaults to "./models/bce-reranker-base_v1".
             persist_directory (str, optional): 数据持久化路径. Defaults to "./vector_db/faiss".
-            similarity_top_k (int, optional): 相似数据 top_k. Defaults to 7.
+            similarity_top_k (int, optional): 相似数据 top_k. Defaults to 5.
             score_threshold (float, optional): 最低分数. Defaults to 0.15.
             allow_suffix (tuple[str] | str, optional): 读取文件的后缀. Defaults to (".txt", ".md", ".docx", ".doc", ".pdf").
         """
@@ -69,10 +69,13 @@ class VectorDatabase:
             for filename in filenames:
                 # 通过后缀名判断文件类型是否满足要求
                 if filename.endswith(self.allow_suffix):
+                    # 忽略 readme.md
+                    # if filename.lower() == 'readme.md':
+                    #     continue
                     file_list.append(os.path.join(filepath, filename))
         return file_list
 
-    def get_text(self, dir_path: str) -> list:
+    def get_text(self, file_lst: list) -> list:
         """遍历文件夹获取所有目标文件
 
         Args:
@@ -81,9 +84,6 @@ class VectorDatabase:
         Returns:
             list: 目标文件列表
         """
-        # args：dir_path，目标文件夹路径
-        # 首先调用上文定义的函数得到目标文件路径列表
-        file_lst = self.get_files(dir_path)
         # docs 存放加载之后的纯文本对象
         docs = []
         # 遍历所有目标文件
@@ -120,19 +120,15 @@ class VectorDatabase:
 
         from langchain_community.vectorstores import FAISS
 
-        dirs = os.listdir(self.data_path)
-        dirs = [os.path.join(self.data_path, dir) for dir in dirs]
-        dirs = [dir for dir in dirs if os.path.isdir(dir)]
+        file_lst = self.get_files(self.target_dir)
 
         # 加载目标文件
-        docs = []
-        for dir_path in dirs:
-            docs.extend(self.get_text(dir_path))
+        docs = self.get_text(file_lst)
 
         # 对文本进行分块
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size = 500,
-            chunk_overlap = 150
+            chunk_size = 768,
+            chunk_overlap = 32
         )
         split_docs = text_splitter.split_documents(docs)
 
@@ -209,7 +205,7 @@ class VectorDatabase:
         assert self.retriever is not None, "请先调用 `create_faiss_retriever` 或者 `create_faiss_reranker_retriever` 创建检索器"
 
         # similarity search
-        documents = self.retriever.get_relevant_documents(query)
+        documents = self.retriever.invoke(query)
         documents_str = format_documents(documents)
         # 获取参考文档并去重
         references = list(set([get_filename(doc.metadata['source']) for doc in documents]))

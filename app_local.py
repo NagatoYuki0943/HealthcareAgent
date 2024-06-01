@@ -1,6 +1,6 @@
 import os
 from infer_engine import InferEngine, TransformersConfig
-from database import VectorDatabase
+from vector_database import VectorDatabase
 import gradio as gr
 from typing import Generator, Sequence
 import threading
@@ -11,13 +11,13 @@ from utils import remove_history_references
 logger.info(f"gradio version: {gr.__version__}")
 
 
-DATA_PATH = "./data"
-EMBEDDING_MODEL_PATH = "./models/bce-embedding-base_v1"
-RERANKER_MODEL_PATH : str = "./models/bce-reranker-base_v1"
-PERSIST_DIRECTORY = "./vector_db/faiss"
-SIMILARITY_TOP_K = 7
-SCORE_THRESHOLD = 0.15
-ALLOW_SUFFIX = (".pdf")
+DATA_PATH: str  = "./data"
+EMBEDDING_MODEL_PATH: str  = "./models/bce-embedding-base_v1"
+RERANKER_MODEL_PATH: str = "./models/bce-reranker-base_v1"
+PERSIST_DIRECTORY: str  = "./vector_db/faiss"
+SIMILARITY_TOP_K: int = 5
+SCORE_THRESHOLD: float = 0.15
+ALLOW_SUFFIX: tuple[str] = (".txt", ".md", ".docx", ".doc", ".pdf")
 
 vector_database = VectorDatabase(
     data_path = DATA_PATH,
@@ -29,7 +29,7 @@ vector_database = VectorDatabase(
     allow_suffix = ALLOW_SUFFIX
 )
 # 创建数据库
-vector_database.create_faiss_vectordb()
+vector_database.create_faiss_vectordb(force=False)
 # 载入数据库(创建数据库后不需要载入也可以)
 vector_database.load_faiss_vectordb()
 # 创建相似度 retriever
@@ -38,7 +38,7 @@ vector_database.load_faiss_vectordb()
 vector_database.create_faiss_reranker_retriever()
 
 # clone 模型
-PRETRAINED_MODEL_NAME_OR_PATH = './models/internlm2-chat-1_8b'
+PRETRAINED_MODEL_NAME_OR_PATH = "./models/internlm2-chat-1_8b"
 # os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-1.8b {PRETRAINED_MODEL_NAME_OR_PATH}')
 # os.system(f'cd {PRETRAINED_MODEL_NAME_OR_PATH} && git lfs pull')
 ADAPTER_PATH = None
@@ -129,8 +129,6 @@ def chat(
     yield history + [[query, response + references_str]]
     logger.info(f"references_str: {references_str}")
     logger.info(f"history_without_rag: {history + [[query, response + references_str]]}")
-    # 查看GPU使用情况
-    os.system("nvidia-smi")
 
 
 def regenerate(
