@@ -4,31 +4,54 @@
 
 ## 使用步骤
 
-1. 安装依赖，安装 `requirements.txt` 中的依赖，可能不全，如果有需要按照的包里面没包含请告诉我
+1. 安装依赖
 
-2. 下载模型
+   安装 `requirements.txt` 中的 python package 依赖。
 
-运行 `download_hf.py` 文件下载向量化模型和 internlm2 模型
+   安装 git 和 git-lfs 用来下载模型。
 
-也可以自己下载放到 models 目录下
+   ```sh
+   # linux
+   sudo apt install git
+   sudo apt install git-lfs
+   
+   # windows
+   git lfs install
+   ```
 
-3. 建立一个 `data` 目录，然后将群里的压缩包解压到data内，最终路径为 `data/FM docs 2024.3/*.pdf`
+2. 建立一个 `data` 目录，然后将自己的数据放入这个目录中，可以在 `data` 中新建目录或者直接将所有文件让如 `data` 目录中。
 
-4. 建立向量数据库
+在 `app.py` 和 `app_local.py` 中有如下参数，可以选择需要的文件类型。
 
-运行`database.py`建立数据库
+```python
+ALLOW_SUFFIX: tuple[str] = (".txt", ".md", ".docx", ".doc", ".pdf")
+```
 
-5. 运行
+3. 下载模型（可选）
 
-`run_langchain.py` 是命令行运行模型，功能不全
+运行如下命令下载模型。
 
-`run_langchain_gradio.py`是使用 langchain 运行模型，功能不全
+由于使用的 Embedding 和 Reranker 模型需要同意协议才能下载，所以需要登陆 [Huggingface](https://huggingface.co/) ，进入两个模型的页面（ [bce-embedding-base_v1](https://huggingface.co/maidalun1020/bce-embedding-base_v1) 和 [bce-reranker-base_v1](https://huggingface.co/maidalun1020/bce-reranker-base_v1)）点击同意协议，之后在 [token](https://huggingface.co/settings/tokens) 界面获取token，放入环境变量中。
 
-`run_custom_gradio.py` 会议中展示的，功能最全
+```sh
+# linux:
+export HF_TOKEN="your token"
 
-`app.py` 内容和 `run_custom_gradio.py` 相同，不同点是会下载数据集，创建数据库，下载模型并运行，并使用了 lmdeploy 加速
+# powershell:
+$env:HF_TOKEN="your token"
 
+python download_hf.py
+```
 
+4. 运行
+
+使用如下命令启动应用。
+
+```sh
+python app.py # 使用 lmdeploy 部署，会自动下载模型和数据集，同样需要设置 HF_TOKEN
+
+python app_local.py # 使用 transformers 部署，支持 windows，不会自动下载模型和数据集，需要步骤3
+```
 
 # 说明
 
