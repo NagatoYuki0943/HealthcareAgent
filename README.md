@@ -54,7 +54,13 @@ python app.py # 使用 lmdeploy 部署，会自动下载模型和数据集，同
 python app_local.py # 使用 transformers 部署，支持 windows，不会自动下载模型和数据集，需要步骤3
 ```
 
-5. 其他
+5. 远程连接
+
+```sh
+ssh -CNg -L 7860:127.0.0.1:7860 root@ssh.intern-ai.org.cn -p 你自己的端口号
+```
+
+6. 其他
 
 `download_dataset.py` 专门下载 openxlab 上的数据集
 
