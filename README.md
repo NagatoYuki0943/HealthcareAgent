@@ -54,6 +54,12 @@ python app.py # 使用 lmdeploy 部署，会自动下载模型和数据集，同
 python app_local.py # 使用 transformers 部署，支持 windows，不会自动下载模型和数据集，需要步骤3
 ```
 
+5. 其他
+
+`download_dataset.py` 专门下载 openxlab 上的数据集
+
+`vector_database_create.py` 用来重新创建向量数据库
+
 # 说明
 
 模型运行步骤：
