@@ -1,6 +1,6 @@
 # HealthcareAgent
 
-使用rag对医学数据进行检索
+在医学领域，准确、及时的信息对于诊断和治疗至关重要。为了提高医学问题回答的准确率，我们开发了一个基于RAG（Retrieval-Augmented Generation）模型的医学问题回答助手。该助手结合了先进的检索技术和生成技术，通过检索向量数据库来获取相关信息，从而生成精确、可靠的医学回答。
 
 ## 使用步骤
 
@@ -16,6 +16,7 @@
    sudo apt install git-lfs
    
    # windows
+   # https://git-scm.com/downloads 下载安装 git
    git lfs install
    ```
 
@@ -31,7 +32,7 @@ ALLOW_SUFFIX: tuple[str] = (".txt", ".md", ".docx", ".doc", ".pdf")
 
 运行如下命令下载模型。
 
-由于使用的 Embedding 和 Reranker 模型需要同意协议才能下载，所以需要登陆 [Huggingface](https://huggingface.co/) ，进入两个模型的页面（ [bce-embedding-base_v1](https://huggingface.co/maidalun1020/bce-embedding-base_v1) 和 [bce-reranker-base_v1](https://huggingface.co/maidalun1020/bce-reranker-base_v1)）点击同意协议，之后在 [token](https://huggingface.co/settings/tokens) 界面获取token，放入环境变量中。
+由于使用的 Embedding 和 Reranker 模型需要同意协议才能下载，所以需要登陆 [Huggingface](https://huggingface.co/) ，进入两个模型的页面（ [bce-embedding-base_v1](https://huggingface.co/maidalun1020/bce-embedding-base_v1) 和 [bce-reranker-base_v1](https://huggingface.co/maidalun1020/bce-reranker-base_v1)）点击同意协议，之后在 [tokens](https://huggingface.co/settings/tokens) 界面获取token，放入环境变量中。也可以使用 [modelscope](https://www.modelscope.cn/) 下载模型，不需要 token。
 
 ```sh
 # linux:
@@ -81,7 +82,7 @@ python app_local.py # 使用 transformers 部署，支持 windows，不会自动
 
    这样做的原因有2点：一是在使用过程中发现，在有历史记录且历史记录的对话没使用检索信息，新的对话也没有使用检索的时候，有时在模型输出的结尾会打印两次 `no reference.`，我排查后发现第一次的打印是模型自己输出的，也就是模型根据历史记录学会了在合适的情况下添加`no reference.`，而这不是我们想要的结果。是这些参考文档也会占用模型的 token 数量，模型的 token 是有上限的，过长会影响模型输出效果。
 
-## TODO
+# TODO
 
 - [x] 返回参考文档
 - [x] 当前使用 transformers 库进行推理，速度较慢，可以换成 lmdeploy 库进行加速
