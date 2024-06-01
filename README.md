@@ -8,6 +8,10 @@
 
    安装 `requirements.txt` 中的 python package 依赖。
 
+   ```sh
+   pip install -r requirements.txt
+   ```
+
    安装 git 和 git-lfs 用来下载模型。
 
    ```sh
