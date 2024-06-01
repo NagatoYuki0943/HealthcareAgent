@@ -53,9 +53,9 @@ python download_hf.py
 使用如下命令启动应用。
 
 ```sh
-python app.py # 使用 lmdeploy 部署，会自动下载模型和数据集，同样需要设置 HF_TOKEN
+python app.py # 会自动下载模型和数据集，同样需要设置 HF_TOKEN，使用 lmdeploy 部署
 
-python app_local.py # 使用 transformers 部署，支持 windows，不会自动下载模型和数据集，需要步骤3
+python app_local.py # 不会自动下载模型和数据集，需要步骤3手动下载模型，使用 transformers 部署，支持 windows
 ```
 
 5. 远程连接
