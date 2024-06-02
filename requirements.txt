@@ -9,14 +9,14 @@ sentencepiece
 einops
 accelerate
 tiktoken
-langchain==0.1.20 # 指定版本，否则openxlab上会下载全部版本,langchain 0.2.0 版本在 openxlab 上会爆显存,原因不明
-langchain-community==0.0.38 # 指定版本，否则openxlab上会下载全部版本
-chromadb>=0.5.0 # 指定版本，否则openxlab上会下载全部版本
+langchain
+langchain-community
+chromadb
 pysqlite3-binary
 faiss-cpu
 pypdf
-unstructured>=0.14.3 # txt,md,doc,docx # 指定版本，否则openxlab上会下载全部版本
+unstructured # txt,md,doc,docx
 python-docx # doc,docx
 lmdeploy
-openxlab>=0.1.0 # 不兼容openxlab默认版本
+openxlab
 loguru
