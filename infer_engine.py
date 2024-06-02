@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Generator, AsyncGenerator, Literal, Sequence
 import torch
 import transformers
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoProcessor, AutoModelForCausalLM
 from transformers.generation.streamers import BaseStreamer
 from threading import Thread
 from queue import Empty, Queue
@@ -161,6 +161,9 @@ class TransfomersEngine(DeployEngine):
 
         # tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
+
+        # processor: Multimodal tasks require a processor that combines two types of preprocessing tools.
+        self.processor = AutoProcessor.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
 
         # 量化
         quantization_config = BitsAndBytesConfig(
