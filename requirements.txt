@@ -1,7 +1,7 @@
 gradio>4.0.0 # 不支持 3.x 版本
 huggingface_hub>=0.23.2
 transformers==4.36.2
-peft>=0.11.1
+peft==0.9.0
 sentence-transformers>=3.0.0
 bcembedding>=0.1.5
 bitsandbytes>=0.43.1
