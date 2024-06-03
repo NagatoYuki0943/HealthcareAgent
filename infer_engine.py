@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import Generator, AsyncGenerator, Literal, Sequence
+from typing import Generator, AsyncGenerator, Literal, Sequence, Any
+from lmdeploy.serve.async_engine import GenOut
+from lmdeploy.serve.openai.api_client import APIClient
 import torch
+from torch import Tensor
 import transformers
 from transformers import AutoTokenizer, AutoProcessor, AutoModelForCausalLM
 from transformers.generation.streamers import BaseStreamer
@@ -150,7 +153,6 @@ class DeployEngine(ABC):
 class TransfomersEngine(DeployEngine):
     def __init__(self, config: TransformersConfig) -> None:
         from transformers import BitsAndBytesConfig
-        from peft import PeftModel
 
         logger.info(f"torch version: {torch.__version__}")
         logger.info(f"transformers version: {transformers.__version__}")
@@ -160,10 +162,10 @@ class TransfomersEngine(DeployEngine):
         self.config = config
 
         # tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
+        self.tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
 
         # processor: Multimodal tasks require a processor that combines two types of preprocessing tools.
-        self.processor = AutoProcessor.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
+        self.processor: AutoProcessor = AutoProcessor.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
 
         # 量化
         quantization_config = BitsAndBytesConfig(
@@ -187,12 +189,13 @@ class TransfomersEngine(DeployEngine):
         )
 
         if config.adapter_path:
+            from peft.peft_model import PeftModel
             logger.info(f"load adapter: {config.adapter_path}")
             # 2种加载adapter的方式
             # 1. load adapter https://huggingface.co/docs/transformers/main/zh/peft
             # self.model.load_adapter(adapter_path)
             # 2. https://huggingface.co/docs/peft/main/en/package_reference/peft_model#peft.PeftModel.from_pretrained
-            self.model = PeftModel.from_pretrained(self.model, config.adapter_path)
+            self.model: PeftModel = PeftModel.from_pretrained(self.model, config.adapter_path)
 
         self.model.eval()
 
@@ -201,10 +204,10 @@ class TransfomersEngine(DeployEngine):
         # 获取对话模板
         self.prompt_template: dict = get_prompt_template(config.model_name)
         # 停止词
-        self.stop_words = [self.tokenizer.eos_token] + self.prompt_template.get('STOP_WORDS', [])
+        self.stop_words: list[str] = [self.tokenizer.eos_token] + self.prompt_template.get('STOP_WORDS', [])
         logger.info(f"stop_words: {self.stop_words}")
         # 停止id
-        self.stop_ids = self.tokenizer.convert_tokens_to_ids(self.stop_words)
+        self.stop_ids: list[int] = self.tokenizer.convert_tokens_to_ids(self.stop_words)
         logger.info(f"stop_ids: {self.stop_ids}")
 
     # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1136-L1146
@@ -243,15 +246,15 @@ class TransfomersEngine(DeployEngine):
         history = [] if history is None else list(history)
 
         # 对话模板的各个部分
-        system_template = self.prompt_template.get('SYSTEM', '<|System|>:{system}\n')
-        instruction_template = self.prompt_template.get('INSTRUCTION', '<|User|>:{input}\n<|Bot|>:')
-        suffix = self.prompt_template.get('SUFFIX', "")
-        sep = self.prompt_template.get('SEP', '\n')
+        system_template: str = self.prompt_template.get('SYSTEM', '<|System|>:{system}\n')
+        instruction_template: str = self.prompt_template.get('INSTRUCTION', '<|User|>:{input}\n<|Bot|>:')
+        suffix: str = self.prompt_template.get('SUFFIX', "")
+        sep: str = self.prompt_template.get('SEP', '\n')
 
         if tokenizer.add_bos_token:
-            prompt = ""
+            prompt: str = ""
         else:
-            prompt = tokenizer.bos_token
+            prompt: str = tokenizer.bos_token
         # 系统指令
         if meta_instruction:
             prompt += system_template.format(system=meta_instruction)
@@ -284,10 +287,10 @@ class TransfomersEngine(DeployEngine):
         history = [] if history is None else list(history)
         # _, inputs = self.build_inputs(tokenizer, query, history, meta_instruction)
         _, inputs = self.build_inputs_advanced(tokenizer, query, history, meta_instruction)
-        inputs = {k: v.to(self.model.device) for k, v in inputs.items() if torch.is_tensor(v)}
+        inputs: dict = {k: v.to(self.model.device) for k, v in inputs.items() if torch.is_tensor(v)}
         # also add end-of-assistant token in eos token id to avoid unnecessary generation
         # eos_token_id = [tokenizer.eos_token_id, tokenizer.convert_tokens_to_ids(["<|im_end|>"])[0]]
-        outputs = self.model.generate(
+        outputs: Tensor = self.model.generate(
             **inputs,
             streamer=streamer,
             max_new_tokens=max_new_tokens,
@@ -298,7 +301,7 @@ class TransfomersEngine(DeployEngine):
             **kwargs,
         )
         outputs = outputs[0].cpu().tolist()[len(inputs["input_ids"][0]) :]
-        response = tokenizer.decode(outputs, skip_special_tokens=True)
+        response: str = tokenizer.decode(outputs, skip_special_tokens=True)
         response = response.split("<|im_end|>")[0]
         history = history + [(query, response)]
         return response, history
@@ -326,7 +329,7 @@ class TransfomersEngine(DeployEngine):
 
         response_queue = Queue(maxsize=20)
 
-        stop_words = self.stop_words
+        stop_words: list[str] = self.stop_words
 
         class ChatStreamer(BaseStreamer):
             def __init__(self, tokenizer) -> None:
@@ -352,20 +355,20 @@ class TransfomersEngine(DeployEngine):
                     return
 
                 self.cache.extend(value.tolist())
-                token = self.tokenizer.decode(self.cache, skip_special_tokens=True)
+                token: str = self.tokenizer.decode(self.cache, skip_special_tokens=True)
                 # if token.strip() != "<|im_end|>":
                 if token.strip() not in stop_words:
-                    self.response = self.response + token
-                    history = self.history + [(self.query, self.response)]
+                    self.response: str = self.response + token
+                    history: list = self.history + [(self.query, self.response)]
                     self.queue.put((self.response, history))
-                    self.cache = []
+                    self.cache: list = []
                 else:
                     self.end()
 
-            def end(self):
+            def end(self) -> None:
                 self.queue.put(None)
 
-        def stream_producer():
+        def stream_producer()-> tuple[str, Sequence]:
             return self.__chat(
                 tokenizer=tokenizer,
                 query=query,
@@ -378,7 +381,7 @@ class TransfomersEngine(DeployEngine):
                 **kwargs,
             )
 
-        def consumer():
+        def consumer() -> Generator[Any, Any, None]:
             producer = Thread(target=stream_producer)
             # 启动多线程
             producer.start()
@@ -558,11 +561,13 @@ class LmdeployLocalEngine(LmdeployEngine):
         super().__init__(config)
 
         from lmdeploy import pipeline
+        from lmdeploy.serve.async_engine import AsyncEngine
+        from lmdeploy.serve.vl_async_engine import VLAsyncEngine
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py
-        self.pipe = pipeline(
+        self.pipe: AsyncEngine | VLAsyncEngine = pipeline(
             model_path = config.model_path,
             model_name = None,
             backend_config = self.backend_config,
@@ -597,7 +602,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         from lmdeploy.messages import GenerationConfig, Response
         from lmdeploy.serve.async_engine import _get_event_loop
 
-        need_list_wrap = isinstance(prompts, str) or isinstance(
+        need_list_wrap: bool = isinstance(prompts, str) or isinstance(
             prompts[0], dict)
         prompts = [prompts] if need_list_wrap else prompts
         need_list_wrap = isinstance(session_ids, int)
@@ -616,7 +621,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         assert len(prompts) == len(gen_config),\
                 'input gen_confg length differs from the length of prompts' # noqa
         outputs = Queue()
-        generators = []
+        generators: list = []
         # for i, prompt in enumerate(prompts):
         for prompt, session_id, gen_conf in zip(prompts, session_ids, gen_config):
             generators.append(
@@ -630,14 +635,14 @@ class LmdeployLocalEngine(LmdeployEngine):
                               adapter_name=adapter_name,
                               **kwargs))
 
-        async def _inner_call(i, generator):
+        async def _inner_call(i, generator) -> None:
             async for out in generator:
                 outputs.put(
                     Response(out.response, out.generate_token_len,
                              out.input_token_len, i, out.finish_reason,
                              out.token_ids, out.logprobs))
 
-        async def gather():
+        async def gather() -> None:
             await asyncio.gather(
                 # *[_inner_call(i, generators[i]) for i in range(len(prompts))])
                 *[_inner_call(session_id, generator) for session_id, generator in zip(session_ids, generators)])
@@ -694,7 +699,7 @@ class LmdeployLocalEngine(LmdeployEngine):
             gen_config.random_seed = random.getrandbits(64)
 
         outputs = Queue()
-        generator = self.pipe.generate(prompt,
+        generator: AsyncGenerator[GenOut, Any] = self.pipe.generate(prompt,
                               session_id,
                               gen_config=gen_config,
                               stream_response=True,
@@ -704,19 +709,19 @@ class LmdeployLocalEngine(LmdeployEngine):
                               adapter_name=adapter_name,
                               **kwargs)
 
-        async def _inner_call(i, generator):
+        async def _inner_call(i, generator) -> None:
             async for out in generator:
                 outputs.put(
                     Response(out.response, out.generate_token_len,
                              out.input_token_len, i, out.finish_reason,
                              out.token_ids, out.logprobs))
 
-        async def gather():
+        async def gather() -> None:
             await asyncio.gather(
                 _inner_call(session_id, generator))
             outputs.put(None)
 
-        loop = _get_event_loop()
+        loop: asyncio.AbstractEventLoop = _get_event_loop()
         proc = Thread(target=lambda: loop.run_until_complete(gather()))
         # 启动多线程
         proc.start()
@@ -836,7 +841,7 @@ class LmdeployLocalEngine(LmdeployEngine):
             adapter_name = None
         ).response
         logger.info(f"response: {response}")
-        response_text = response.text
+        response_text: str = response.text
         logger.info(f"response_text: {response_text}")
         history.append([query, response_text])
         logger.info(f"history: {history}")
@@ -883,7 +888,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"gen_config: {gen_config}")
 
         logger.info(f"query: {query}")
-        response_text = ""
+        response_text: str = ""
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
         response: Response
@@ -930,13 +935,13 @@ class LmdeployServeEngine(LmdeployEngine):
             ssl = config.ssl,
         )
 
-        self.api_server_url = f'http://{config.server_name}:{config.server_port}'
+        self.api_server_url: str = f'http://{config.server_name}:{config.server_port}'
         self.api_key = config.api_keys
 
         # 启动一个 client,所有访问共同使用一个 client,不清楚是否有影响
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_client.py
-        self.api_client = client(
+        self.api_client: APIClient = client(
             api_server_url = self.api_server_url,
             api_key = self.api_key
         )
@@ -968,7 +973,7 @@ class LmdeployServeEngine(LmdeployEngine):
         }))
 
         logger.info(f"query: {query}")
-        response_text = ""
+        response_text: str = ""
         response: dict
         for response in self.api_client.chat_interactive_v1(
             prompt = prompt,
@@ -1079,7 +1084,7 @@ class ApiEngine(DeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = [
+        prompt: list[dict[str, str]] = [
             {
                 "role": "system",
                 "content": self.config.system_prompt
@@ -1194,7 +1199,7 @@ class ApiEngine(DeployEngine):
                 top_p = top_p,
             )
 
-            response_text = ""
+            response_text: str = ""
             for chunk in completion:
                 # ChatCompletionChunk(
                 #   id='chatcmpl-02ab3417a31449398bd950e1a8cf12a1',
