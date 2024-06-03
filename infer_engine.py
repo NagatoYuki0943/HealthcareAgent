@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Generator, AsyncGenerator, Literal, Sequence, Any
-from lmdeploy.serve.async_engine import GenOut
-from lmdeploy.serve.openai.api_client import APIClient
 import torch
 from torch import Tensor
 import transformers
@@ -690,7 +688,7 @@ class LmdeployLocalEngine(LmdeployEngine):
                 Pick one from adapters. Default to None, using the base model.
         """
         from lmdeploy.messages import GenerationConfig, Response
-        from lmdeploy.serve.async_engine import _get_event_loop
+        from lmdeploy.serve.async_engine import GenOut, _get_event_loop
 
         if gen_config is None:
             gen_config = GenerationConfig()
@@ -917,6 +915,7 @@ class LmdeployServeEngine(LmdeployEngine):
         super().__init__(config)
 
         from lmdeploy import serve, client
+        from lmdeploy.serve.openai.api_client import APIClient
 
         # 启动服务
         # https://lmdeploy.readthedocs.io/zh-cn/latest/serving/api_server.html
