@@ -1,3 +1,4 @@
+from langchain_core.documents import Document
 from langchain_community.document_loaders import (
     UnstructuredFileLoader,
     UnstructuredMarkdownLoader,
@@ -10,7 +11,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from tqdm import tqdm
 import os
 from loguru import logger
-from utils import get_filename, format_documents, format_references
+from utils import get_filename, format_documents, format_references, hashfile
 
 
 class VectorDatabase:
@@ -23,7 +24,7 @@ class VectorDatabase:
         similarity_top_k: int = 5,
         score_threshold: float = 0.15,
         allow_suffix: tuple[str] | str = (".txt", ".md", ".docx", ".doc", ".pdf"),
-    ):
+    ) -> None:
         """
         Args:
             data_path (str, optional): 数据集路径. Defaults to "./data".
@@ -53,7 +54,7 @@ class VectorDatabase:
         self.embeddings.client = self.embeddings.client.half()
         self.retriever = None
 
-    def get_files(self, dir_path: str,) -> list:
+    def get_files(self, dir_path: str) -> list[str]:
         """遍历文件夹获取所有目标文件路径
 
         Args:
@@ -75,34 +76,47 @@ class VectorDatabase:
                     file_list.append(os.path.join(filepath, filename))
         return file_list
 
-    def get_text(self, file_lst: list) -> list:
+    def get_text(self, file_list: list[str]) -> list:
         """遍历文件夹获取所有目标文件
 
         Args:
-            dir_path (str): 目标文件夹
+            file_list (list[str]): 文件列表
 
         Returns:
             list: 目标文件列表
         """
         # docs 存放加载之后的纯文本对象
-        docs = []
+        docs: list = []
+        file_hashes: list[str] = []
+        repeated_files: list[str] = []
         # 遍历所有目标文件
-        for one_file in tqdm(file_lst):
-            if one_file.endswith(".txt"):
+        for file in tqdm(file_list):
+            # 运算文件hash
+            hashcode: str = hashfile(file)
+            if hashcode in file_hashes:
+                logger.warning(f"file: `{file}` repeated, ignore this file")
+                repeated_files.append(file)
+                continue
+            file_hashes.append(hashcode)
+
+            if file.endswith(".txt"):
                 # txt, md, docx, doc: pip install unstructured
-                loader = UnstructuredFileLoader(one_file)
-            elif one_file.endswith(".md"):
-                loader = UnstructuredMarkdownLoader(one_file)
-            elif one_file.endswith((".docx", ".doc")):
+                loader = UnstructuredFileLoader(file)
+            elif file.endswith(".md"):
+                loader = UnstructuredMarkdownLoader(file)
+            elif file.endswith((".docx", ".doc")):
                 # pip install python-docx
-                loader = UnstructuredWordDocumentLoader(one_file)
-            elif one_file.endswith(".pdf"):
+                loader = UnstructuredWordDocumentLoader(file)
+            elif file.endswith(".pdf"):
                 # pip install pypdf
-                loader = PyPDFLoader(one_file)
+                loader = PyPDFLoader(file)
             docs.extend(loader.load())
+
+        if len(repeated_files) > 0:
+            logger.warning(f"repeated_files: {', '.join(repeated_files)}, please delete them.")
         return docs
 
-    def create_faiss_vectordb(self, force: bool = False):
+    def create_faiss_vectordb(self, force: bool = False) -> None:
         """创建数据库
 
         Args:
@@ -120,10 +134,10 @@ class VectorDatabase:
 
         from langchain_community.vectorstores import FAISS
 
-        file_lst = self.get_files(self.data_path)
+        file_list = self.get_files(self.data_path)
 
         # 加载目标文件
-        docs = self.get_text(file_lst)
+        docs = self.get_text(file_list)
 
         # 对文本进行分块
         text_splitter = RecursiveCharacterTextSplitter(
@@ -141,7 +155,7 @@ class VectorDatabase:
         # 将加载的向量数据库持久化到磁盘上
         self.vectordb.save_local(folder_path = self.persist_directory)
 
-    def load_faiss_vectordb(self):
+    def load_faiss_vectordb(self) -> None:
         """载入数据库"""
         from langchain_community.vectorstores import FAISS
         from langchain_community.vectorstores.utils import DistanceStrategy
@@ -156,7 +170,7 @@ class VectorDatabase:
             normalize_L2 = False
         )
 
-    def create_faiss_retriever(self):
+    def create_faiss_retriever(self) -> None:
         """创建 Retriever"""
         # search_type: 'similarity', 'similarity_score_threshold', 'mmr'
         self.retriever: VectorStoreRetriever = self.vectordb.as_retriever(
@@ -168,7 +182,7 @@ class VectorDatabase:
             }
         )
 
-    def create_faiss_reranker_retriever(self):
+    def create_faiss_reranker_retriever(self) -> None:
         """创建重排序 Retriever"""
         assert self.reranker_model_path is not None, "使用 reranker 必须指定 `reranker_model_path`"
 
@@ -205,11 +219,11 @@ class VectorDatabase:
         assert self.retriever is not None, "请先调用 `create_faiss_retriever` 或者 `create_faiss_reranker_retriever` 创建检索器"
 
         # similarity search
-        documents = self.retriever.invoke(query)
-        documents_str = format_documents(documents)
+        documents: list[Document] = self.retriever.invoke(query)
+        documents_str: str = format_documents(documents)
         # 获取参考文档并去重
         references = list(set([get_filename(doc.metadata['source']) for doc in documents]))
-        references_str = format_references(references)
+        references_str: str = format_references(references)
         return documents_str, references_str
 
 
