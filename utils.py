@@ -4,6 +4,7 @@ import uuid
 import random
 from typing import Literal
 from langchain_core.documents import Document
+import hashlib
 
 
 def is_used_rag(
@@ -93,6 +94,18 @@ def random_uuid(dtype: Literal['int', 'str', 'bytes', 'time'] = 'int') -> int | 
 def random_uuid_int() -> int:
     """random_uuid 生成的 int uuid 会超出int64的范围,lmdeploy使用会报错"""
     return random.getrandbits(64)
+
+
+# write by codeium
+def hashfile(file: str):
+    sha256 = hashlib.sha256()
+    with open(file, 'rb') as f:
+        while True:
+            data = f.read(1024)
+            if not data:
+                break
+            sha256.update(data)
+    return sha256.hexdigest()
 
 
 if __name__ == "__main__":
