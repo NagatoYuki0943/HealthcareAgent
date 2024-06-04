@@ -20,3 +20,4 @@ python-docx # doc,docx
 lmdeploy
 openxlab
 loguru
+openai
