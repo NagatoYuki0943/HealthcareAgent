@@ -63,12 +63,11 @@ def download_dataset(
     access_key: str | None = None,
     secret_key: str | None = None
 ):
-    import os
     import openxlab
     from openxlab.dataset import get
 
     print("start download dataset")
-    openxlab.login(ak=access_key, sk=secret_key)
+    openxlab.login(ak=access_key, sk=secret_key, relogin=True)
     get(dataset_repo=dataset_repo, target_path=target_path) # 数据集下载
     print("finish download dataset")
 
