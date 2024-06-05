@@ -14,5 +14,5 @@ download_openxlab_dataset(
     dataset_repo = 'NagatoYuki0943/FMdocs',
     target_path = DATA_PATH,
     access_key = openxlab_access_key,
-    secret_key = openxlab_access_key
+    secret_key = openxlab_secret_key
 )
