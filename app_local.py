@@ -80,7 +80,7 @@ LMDEPLOY_CONFIG = LmdeployConfig(
     quant_policy = 0,               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     system_prompt = SYSTEM_PROMPT,
     deploy_method = 'local',
-    log_level = 'DEBUG'
+    log_level = 'ERROR'
 )
 
 # 载入模型
