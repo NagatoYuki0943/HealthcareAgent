@@ -105,7 +105,3 @@ def hashfile(file: str):
                 break
             sha256.update(data)
     return sha256.hexdigest()
-
-
-if __name__ == "__main__":
-    download_dataset()
