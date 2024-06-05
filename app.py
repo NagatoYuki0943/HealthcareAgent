@@ -15,8 +15,8 @@ from loguru import logger
 from infer_engine import InferEngine, LmdeployConfig
 from vector_database import VectorDatabase
 from huggingface_hub import hf_hub_download, snapshot_download
-from utils import remove_history_references, download_dataset
-from ocr_chat import get_ernie_access_token, ocr_detection, get_file_content_as_base64
+from utils import remove_history_references, download_openxlab_dataset
+from ocr_chat import get_ernie_access_token, ocr_detection
 
 
 logger.info(f"gradio version: {gr.__version__}")
@@ -39,11 +39,11 @@ powershell:
 """
 # 获取环境变量
 hf_token = os.getenv("HF_TOKEN", "")
-access_key = os.getenv("OPENXLAB_AK", "")
-secret_key = os.getenv("OPENXLAB_SK", "")
-print(f"hf_token = {hf_token}")
-print(f"access_key = {access_key}")
-print(f"secret_key = {secret_key}")
+openxlab_access_key = os.getenv("OPENXLAB_AK", "")
+openxlab_secret_key = os.getenv("OPENXLAB_SK", "")
+print(f"{hf_token = }")
+print(f"{openxlab_access_key = }")
+print(f"{openxlab_secret_key = }")
 
 # ------------------------腾讯OCR API-----------------------------#
 ocr_secret_id = os.getenv("OCR_SECRET_ID", "")
@@ -80,11 +80,11 @@ snapshot_download(
 )
 
 # 下载数据集,不会重复下载
-download_dataset(
+download_openxlab_dataset(
     dataset_repo = 'NagatoYuki0943/FMdocs',
     target_path = DATA_PATH,
-    access_key = access_key,
-    secret_key = secret_key
+    access_key = openxlab_access_key,
+    secret_key = openxlab_secret_key
 )
 
 # 向量数据库
@@ -279,6 +279,7 @@ def main() -> None:
 
         # 化验报告分析页面
         with gr.Tab("化验报告分析"):
+
             gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>
                             """)
             with gr.Row():

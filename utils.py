@@ -57,7 +57,7 @@ def remove_history_references(history: list) -> list:
     return new_history
 
 
-def download_dataset(
+def download_openxlab_dataset(
     dataset_repo: str = 'NagatoYuki0943/FMdocs',
     target_path: str = './data/',
     access_key: str | None = None,
