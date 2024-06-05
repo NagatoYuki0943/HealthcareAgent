@@ -141,7 +141,7 @@ LMDEPLOY_CONFIG = LmdeployConfig(
 
 # 载入模型
 infer_engine = InferEngine(
-    backend = 'lmdeploy', # transformers, lmdeploy
+    backend = 'lmdeploy', # transformers, lmdeploy, api
     lmdeploy_config = LMDEPLOY_CONFIG
 )
 
