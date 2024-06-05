@@ -3,7 +3,7 @@ import gradio as gr
 from typing import Generator, Sequence
 import threading
 from loguru import logger
-from infer_engine import InferEngine, TransformersConfig
+from infer_engine import InferEngine, TransformersConfig, LmdeployConfig
 from vector_database import VectorDatabase
 from utils import remove_history_references
 
@@ -71,10 +71,23 @@ TRANSFORMERS_CONFIG = TransformersConfig(
     system_prompt = SYSTEM_PROMPT
 )
 
+LMDEPLOY_CONFIG = LmdeployConfig(
+    model_path = PRETRAINED_MODEL_NAME_OR_PATH,
+    backend = 'turbomind',
+    model_name = 'internlm2',
+    model_format = 'hf',
+    cache_max_entry_count = 0.5,    # 调整 KV Cache 的占用比例为0.5
+    quant_policy = 0,               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
+    system_prompt = SYSTEM_PROMPT,
+    deploy_method = 'local',
+    log_level = 'DEBUG'
+)
+
 # 载入模型
 infer_engine = InferEngine(
-    backend = 'transformers', # transformers, lmdeploy
+    backend = 'transformers', # transformers, lmdeploy, api
     transformers_config = TRANSFORMERS_CONFIG,
+    lmdeploy_config = LMDEPLOY_CONFIG
 )
 
 
