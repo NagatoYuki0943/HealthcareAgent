@@ -21,4 +21,5 @@ lmdeploy
 openxlab
 loguru
 openai
+opencv-python
 tencentcloud-sdk-python
