@@ -1,5 +1,5 @@
 import os
-from utils import download_dataset
+from utils import download_openxlab_dataset
 
 
 # 获取环境变量
@@ -10,7 +10,7 @@ print(f"{openxlab_secret_key = }")
 
 DATA_PATH: str = "./data"
 
-download_dataset(
+download_openxlab_dataset(
     dataset_repo = 'NagatoYuki0943/FMdocs',
     target_path = DATA_PATH,
     access_key = openxlab_access_key,
