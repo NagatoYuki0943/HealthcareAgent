@@ -5,15 +5,18 @@
 # sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import os
-from infer_engine import InferEngine, LmdeployConfig
-from vector_database import VectorDatabase
 import gradio as gr
 from typing import Generator, Sequence
 import threading
-from utils import download_dataset
-from huggingface_hub import hf_hub_download, snapshot_download
+import cv2
+import json
+import requests
 from loguru import logger
-from utils import remove_history_references
+from infer_engine import InferEngine, LmdeployConfig
+from vector_database import VectorDatabase
+from huggingface_hub import hf_hub_download, snapshot_download
+from utils import remove_history_references, download_dataset
+from ocr_chat import get_ernie_access_token, ocr_detection, get_file_content_as_base64
 
 
 logger.info(f"gradio version: {gr.__version__}")
@@ -41,6 +44,18 @@ secret_key = os.getenv("OPENXLAB_SK", "")
 print(f"hf_token = {hf_token}")
 print(f"access_key = {access_key}")
 print(f"secret_key = {secret_key}")
+
+# ------------------------腾讯OCR API-----------------------------#
+ocr_secret_id = os.getenv("OCR_SECRET_ID", "")
+ocr_secret_key = os.getenv("OCR_SECRET_KEY", "")
+print(f"{ocr_secret_id = }")
+print(f"{ocr_secret_key = }")
+
+# -------------------------文心一言 API---------------------------#
+ernie_api_key = os.getenv("ERNIE_API_KEY", "")
+ernie_secret_key = os.getenv("ERNIE_SECRET_KEY", "")
+print(f"{ernie_api_key = }")
+print(f"{ernie_secret_key = }")
 
 DATA_PATH: str = "./data"
 EMBEDDING_MODEL_PATH: str = "./models/bce-embedding-base_v1"
@@ -220,127 +235,179 @@ def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
     return query, history
 
 
-def main():
+def ocr_chat(img, query, history:list):
+    txt = ocr_detection(img, ocr_secret_id, ocr_secret_key) + "," + query if img != None else query
+    show_img = cv2.imread(img.name) if img!= None else None
+
+
+    url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-speed-128k?access_token=" + get_ernie_access_token(ernie_api_key, ernie_secret_key)
+    # 注意message必须是奇数条
+    payload = json.dumps({
+    "messages": [
+        {
+            "role": "user",
+            "content": txt,
+        }
+    ]
+    })
+    headers = {
+        'Content-Type': 'application/json'
+    }
+
+    if query == None and img == None:
+        return "", show_img, history, None
+    try:
+        res = requests.request("POST", url, headers=headers, data=payload).json()
+        response = res['result']
+        history.append((query, response))
+
+        return "", show_img, history, None
+    except Exception as e:
+        return e, show_img, history, None
+
+
+def main() -> None:
     block = gr.Blocks()
     with block as demo:
         state_session_id = gr.State(0)
 
         with gr.Row(equal_height=True):
             with gr.Column(scale=15):
-                gr.Markdown("""<h1><center>Healthcare Agent</center></h1>
-                    <center>Healthcare Agent</center>
-                    """)
+                gr.Markdown("""<h1><center>Healthcare Agent</center></h1>""")
             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
 
-        with gr.Row():
-            with gr.Column(scale=4):
-                # 创建聊天框
-                chatbot = gr.Chatbot(height=500, show_copy_button=True, placeholder="内容由 AI 大模型生成，不构成专业医疗意见或诊断。")
 
-                # 组内的组件没有间距
-                with gr.Group():
+        # 化验报告分析页面
+        with gr.Tab("化验报告分析"):
+            gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>
+                            """)
+            with gr.Row():
+
+                img_chatbot = gr.Chatbot(height=450, show_copy_button=True)
+                img_show = gr.Image(label="输入的化验报告图片", height=450)
+
+            with gr.Row():
+                question = gr.Textbox(label="Prompt/问题", scale=2)
+                img_intput = gr.UploadButton('📁', elem_id='upload', file_types=['image'], scale=0)
+                # print(img_intput.name)
+                subbt = gr.Button(value="Chat", scale=0)
+
+        subbt.click(ocr_chat, inputs=[img_intput, question, img_chatbot], outputs=[question, img_show, img_chatbot, img_intput])
+        question.submit(ocr_chat, inputs=[img_intput, question, img_chatbot], outputs=[question, img_show, img_chatbot, img_intput])
+
+
+        # 智能问答页面
+        with gr.Tab("医疗智能问答"):
+
+            with gr.Row():
+                with gr.Column(scale=4):
+                    # 创建聊天框
+                    chatbot = gr.Chatbot(height=500, show_copy_button=True, placeholder="内容由 AI 大模型生成，不构成专业医疗意见或诊断。")
+
+                    # 组内的组件没有间距
+                    with gr.Group():
+                        with gr.Row():
+                            # 创建一个文本框组件，用于输入 prompt。
+                            query = gr.Textbox(
+                                lines=1,
+                                label="Prompt / 问题",
+                                placeholder="Enter 发送; Shift + Enter 换行 / Enter to send; Shift + Enter to wrap"
+                            )
+                            # 创建提交按钮。
+                            # variant https://www.gradio.app/docs/button
+                            # scale https://www.gradio.app/guides/controlling-layout
+                            submit = gr.Button("💬 Chat", variant="primary", scale=0)
+
+                    gr.Examples(
+                        examples=[
+                            ["维生素E有什么作用，请详细说明"],
+                            ["维生素C对治疗眼睛疾病有什么作用，请详细说明"],
+                            ["Please explain the effect of vitamin C on the treatment of eye diseases"]
+                        ],
+                        inputs=[query],
+                        label="示例问题 / Example questions"
+                    )
+
                     with gr.Row():
-                        # 创建一个文本框组件，用于输入 prompt。
-                        query = gr.Textbox(
-                            lines=1,
-                            label="Prompt / 问题",
-                            placeholder="Enter 发送; Shift + Enter 换行 / Enter to send; Shift + Enter to wrap"
-                        )
-                        # 创建提交按钮。
-                        # variant https://www.gradio.app/docs/button
-                        # scale https://www.gradio.app/guides/controlling-layout
-                        submit = gr.Button("💬 Chat", variant="primary", scale=0)
+                        # 创建一个重新生成按钮，用于重新生成当前对话内容。
+                        regen = gr.Button("🔄 Retry", variant="secondary")
+                        undo = gr.Button("↩️ Undo", variant="secondary")
+                        # 创建一个清除按钮，用于清除聊天机器人组件的内容。
+                        clear = gr.ClearButton(components=[chatbot], value="🗑️ Clear", variant="stop")
 
-                gr.Examples(
-                    examples=[
-                        ["维生素E有什么作用，请详细说明"],
-                        ["维生素C对治疗眼睛疾病有什么作用，请详细说明"],
-                        ["Please explain the effect of vitamin C on the treatment of eye diseases"]
-                    ],
-                    inputs=[query],
-                    label="示例问题 / Example questions"
+                    # 折叠
+                    with gr.Accordion("Advanced Options", open=False):
+                        with gr.Row():
+                            max_new_tokens = gr.Slider(
+                                minimum=1,
+                                maximum=2048,
+                                value=1024,
+                                step=1,
+                                label='Max new tokens'
+                            )
+                            temperature = gr.Slider(
+                                minimum=0.01,
+                                maximum=2,
+                                value=0.8,
+                                step=0.01,
+                                label='Temperature'
+                            )
+                            top_p = gr.Slider(
+                                minimum=0.01,
+                                maximum=1,
+                                value=0.8,
+                                step=0.01,
+                                label='Top_p'
+                            )
+                            top_k = gr.Slider(
+                                minimum=1,
+                                maximum=100,
+                                value=40,
+                                step=1,
+                                label='Top_k'
+                            )
+
+                # 回车提交
+                query.submit(
+                    chat,
+                    inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
+                    outputs=[chatbot]
                 )
 
-                with gr.Row():
-                    # 创建一个重新生成按钮，用于重新生成当前对话内容。
-                    regen = gr.Button("🔄 Retry", variant="secondary")
-                    undo = gr.Button("↩️ Undo", variant="secondary")
-                    # 创建一个清除按钮，用于清除聊天机器人组件的内容。
-                    clear = gr.ClearButton(components=[chatbot], value="🗑️ Clear", variant="stop")
+                # 清空query
+                query.submit(
+                    lambda: gr.Textbox(value=""),
+                    [],
+                    [query],
+                )
 
-                # 折叠
-                with gr.Accordion("Advanced Options", open=False):
-                    with gr.Row():
-                        max_new_tokens = gr.Slider(
-                            minimum=1,
-                            maximum=2048,
-                            value=1024,
-                            step=1,
-                            label='Max new tokens'
-                        )
-                        temperature = gr.Slider(
-                            minimum=0.01,
-                            maximum=2,
-                            value=0.8,
-                            step=0.01,
-                            label='Temperature'
-                        )
-                        top_p = gr.Slider(
-                            minimum=0.01,
-                            maximum=1,
-                            value=0.8,
-                            step=0.01,
-                            label='Top_p'
-                        )
-                        top_k = gr.Slider(
-                            minimum=1,
-                            maximum=100,
-                            value=40,
-                            step=1,
-                            label='Top_k'
-                        )
+                # 按钮提交
+                submit.click(
+                    chat,
+                    inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
+                    outputs=[chatbot]
+                )
 
-            # 回车提交
-            query.submit(
-                chat,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
-                outputs=[chatbot]
-            )
+                # 清空query
+                submit.click(
+                    lambda: gr.Textbox(value=""),
+                    [],
+                    [query],
+                )
 
-            # 清空query
-            query.submit(
-                lambda: gr.Textbox(value=""),
-                [],
-                [query],
-            )
+                # 重新生成
+                regen.click(
+                    regenerate,
+                    inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
+                    outputs=[chatbot]
+                )
 
-            # 按钮提交
-            submit.click(
-                chat,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
-                outputs=[chatbot]
-            )
-
-            # 清空query
-            submit.click(
-                lambda: gr.Textbox(value=""),
-                [],
-                [query],
-            )
-
-            # 重新生成
-            regen.click(
-                regenerate,
-                inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
-                outputs=[chatbot]
-            )
-
-            # 撤销
-            undo.click(
-                revocery,
-                inputs=[chatbot],
-                outputs=[query, chatbot]
-            )
+                # 撤销
+                undo.click(
+                    revocery,
+                    inputs=[chatbot],
+                    outputs=[query, chatbot]
+                )
 
         gr.Markdown("""
         ### 内容由 AI 大模型生成，不构成专业医疗意见或诊断。

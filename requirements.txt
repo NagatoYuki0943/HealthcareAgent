@@ -1,23 +1,24 @@
 gradio>4.0.0 # 不支持 3.x 版本
-huggingface_hub
-transformers
-peft
-sentence-transformers
-bcembedding
-bitsandbytes
-sentencepiece
-einops
-accelerate
-tiktoken
-langchain
-langchain-community
-chromadb
-pysqlite3-binary
-faiss-cpu
-pypdf
-unstructured # txt,md,doc,docx
-python-docx # doc,docx
-lmdeploy
-openxlab
-loguru
-openai
+huggingface_hub>=0.23.2
+transformers==4.36.2
+peft==0.9.0
+sentence-transformers>=3.0.0
+bcembedding>=0.1.5
+bitsandbytes>=0.43.1
+sentencepiece>=0.2.0
+einops>=0.8.0
+accelerate>=0.30.1
+tiktoken>=0.7.0
+langchain==0.1.20 # 指定版本，否则openxlab上会下载全部版本,langchain 0.2.0 版本在 openxlab 上会爆显存,原因不明
+langchain-community==0.0.38 # 指定版本，否则openxlab上会下载全部版本
+chromadb>=0.5.0 # 指定版本，否则openxlab上会下载全部版本
+pysqlite3-binary>=0.5.2.post3
+faiss-cpu>=1.8.0
+pypdf>=4.2.0
+unstructured>=0.14.3 # txt,md,doc,docx # 指定版本，否则openxlab上会下载全部版本
+python-docx>=1.1.2 # doc,docx
+lmdeploy>=0.4.2
+openxlab==0.0.38 # 不兼容openxlab默认版本
+loguru>=0.7.2
+openai>=1.30.5
+tencentcloud-sdk-python>=3.0.1161
