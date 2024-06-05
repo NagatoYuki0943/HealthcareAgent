@@ -1,10 +1,10 @@
 import os
-from infer_engine import InferEngine, TransformersConfig
-from vector_database import VectorDatabase
 import gradio as gr
 from typing import Generator, Sequence
 import threading
 from loguru import logger
+from infer_engine import InferEngine, TransformersConfig
+from vector_database import VectorDatabase
 from utils import remove_history_references
 
 

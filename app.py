@@ -5,15 +5,18 @@
 # sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import os
-from infer_engine import InferEngine, LmdeployConfig
-from vector_database import VectorDatabase
 import gradio as gr
 from typing import Generator, Sequence
 import threading
-from utils import download_dataset
-from huggingface_hub import hf_hub_download, snapshot_download
+import cv2
+import json
+import requests
 from loguru import logger
-from utils import remove_history_references
+from infer_engine import InferEngine, LmdeployConfig
+from vector_database import VectorDatabase
+from huggingface_hub import hf_hub_download, snapshot_download
+from utils import remove_history_references, download_dataset
+from ocr_chat import get_ernie_access_token, ocr_detection, get_file_content_as_base64
 
 
 logger.info(f"gradio version: {gr.__version__}")
@@ -41,6 +44,18 @@ secret_key = os.getenv("OPENXLAB_SK", "")
 print(f"hf_token = {hf_token}")
 print(f"access_key = {access_key}")
 print(f"secret_key = {secret_key}")
+
+# ------------------------腾讯OCR API-----------------------------#
+ocr_secret_id = os.getenv("OCR_SECRET_ID", "")
+ocr_secret_key = os.getenv("OCR_SECRET_KEY", "")
+print(f"{ocr_secret_id = }")
+print(f"{ocr_secret_key = }")
+
+# -------------------------文心一言 API---------------------------#
+ernie_api_key = os.getenv("ERNIE_API_KEY", "")
+ernie_secret_key = os.getenv("ERNIE_SECRET_KEY", "")
+print(f"{ernie_api_key = }")
+print(f"{ernie_secret_key = }")
 
 DATA_PATH: str = "./data"
 EMBEDDING_MODEL_PATH: str = "./models/bce-embedding-base_v1"
@@ -220,6 +235,37 @@ def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
     return query, history
 
 
+def ocr_chat(img, query, history:list):
+    txt = ocr_detection(img, ocr_secret_id, ocr_secret_key) + "," + query if img != None else query
+    show_img = cv2.imread(img.name) if img!= None else None
+
+
+    url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-speed-128k?access_token=" + get_ernie_access_token(ernie_api_key, ernie_secret_key)
+    # 注意message必须是奇数条
+    payload = json.dumps({
+    "messages": [
+        {
+            "role": "user",
+            "content": txt,
+        }
+    ]
+    })
+    headers = {
+        'Content-Type': 'application/json'
+    }
+
+    if query == None and img == None:
+        return "", show_img, history, None
+    try:
+        res = requests.request("POST", url, headers=headers, data=payload).json()
+        response = res['result']
+        history.append((query, response))
+
+        return "", show_img, history, None
+    except Exception as e:
+        return e, show_img, history, None
+
+
 def main() -> None:
     block = gr.Blocks()
     with block as demo:
@@ -229,6 +275,26 @@ def main() -> None:
             with gr.Column(scale=15):
                 gr.Markdown("""<h1><center>Healthcare Agent</center></h1>""")
             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
+
+
+        # 化验报告分析页面
+        with gr.Tab("化验报告分析"):
+            gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>
+                            """)
+            with gr.Row():
+
+                img_chatbot = gr.Chatbot(height=450, show_copy_button=True)
+                img_show = gr.Image(label="输入的化验报告图片", height=450)
+
+            with gr.Row():
+                question = gr.Textbox(label="Prompt/问题", scale=2)
+                img_intput = gr.UploadButton('📁', elem_id='upload', file_types=['image'], scale=0)
+                # print(img_intput.name)
+                subbt = gr.Button(value="Chat", scale=0)
+
+        subbt.click(ocr_chat, inputs=[img_intput, question, img_chatbot], outputs=[question, img_show, img_chatbot, img_intput])
+        question.submit(ocr_chat, inputs=[img_intput, question, img_chatbot], outputs=[question, img_show, img_chatbot, img_intput])
+
 
         # 智能问答页面
         with gr.Tab("医疗智能问答"):

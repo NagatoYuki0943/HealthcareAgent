@@ -21,3 +21,4 @@ lmdeploy>=0.4.2
 openxlab==0.0.38 # 不兼容openxlab默认版本
 loguru>=0.7.2
 openai>=1.30.5
+tencentcloud-sdk-python>=3.0.1161
