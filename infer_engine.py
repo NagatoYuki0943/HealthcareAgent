@@ -60,15 +60,15 @@ class ApiConfig:
 
 
 def convert_to_openai_history(
-    query: str,
-    history: Sequence
+    history: Sequence,
+    query: str | None,
 ) -> list:
     """
     将历史记录转换为openai格式
 
     Args:
-        query (str): query
         history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query (str | None): query
 
     Returns:
         list: a chat history in OpenAI format or a list of chat history.
@@ -109,13 +109,14 @@ def convert_to_openai_history(
                 "role": "assistant",
                 "content": assistant
             })
-    # 需要添加当前的query
-    prompt.append(
-        {
-            "role": "user",
-            "content": query
-        }
-    )
+    if query is not None:
+        # 需要添加当前的query
+        prompt.append(
+            {
+                "role": "user",
+                "content": query
+            }
+        )
     return prompt
 
 
@@ -806,7 +807,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(query, history)
+        prompt = convert_to_openai_history(history, query)
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
@@ -864,7 +865,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(query, history)
+        prompt = convert_to_openai_history(history, query)
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
@@ -962,7 +963,7 @@ class LmdeployServeEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(query, history)
+        prompt = convert_to_openai_history(history, query)
 
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
@@ -1088,7 +1089,7 @@ class ApiEngine(DeployEngine):
                 "role": "system",
                 "content": self.config.system_prompt
             },
-        ] + convert_to_openai_history(query, history)
+        ] + convert_to_openai_history(history, query)
         logger.info(f"prompt: {prompt}")
 
         logger.info("gen_config: {}".format({
@@ -1171,7 +1172,7 @@ class ApiEngine(DeployEngine):
                 "role": "system",
                 "content": self.config.system_prompt
             },
-        ] + convert_to_openai_history(query, history)
+        ] + convert_to_openai_history(history, query)
         logger.info(f"prompt: {prompt}")
 
         logger.info("gen_config: {}".format({
