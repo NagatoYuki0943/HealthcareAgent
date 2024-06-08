@@ -12,7 +12,7 @@ import cv2
 import json
 import requests
 from loguru import logger
-from infer_engine import InferEngine, LmdeployConfig
+from infer_engine import InferEngine, LmdeployConfig, convert_to_openai_history
 from vector_database import VectorDatabase
 from huggingface_hub import hf_hub_download, snapshot_download
 from utils import remove_history_references, download_openxlab_dataset
@@ -235,35 +235,41 @@ def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
     return query, history
 
 
-def ocr_chat(img, query, history:list):
-    txt = ocr_detection(img, ocr_secret_id, ocr_secret_key) + "," + query if img != None else query
-    show_img = cv2.imread(img.name) if img!= None else None
+def ocr_chat(img, query, history: list, current_img: str):
+    logger.info(f"{img = }")
+    logger.info(f"{current_img = }")
 
+    # 有图片且图片不是之前的图片才使用ocr
+    if img != None and img != current_img:
+        logger.warning(f"use ocr")
+        ocr_result: str = ocr_detection(img, ocr_secret_id, ocr_secret_key)
+        txt = f"图片ocr检测结果:\n<ocr>\n{ocr_result}\n</ocr>\n question: {query}"
+        current_img = img
+    else:
+        txt = query
+    logger.info(f"{txt = }")
 
     url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-speed-128k?access_token=" + get_ernie_access_token(ernie_api_key, ernie_secret_key)
-    # 注意message必须是奇数条
-    payload = json.dumps({
-    "messages": [
-        {
-            "role": "user",
-            "content": txt,
-        }
-    ]
-    })
+
+    # 将历史记录转换为openai格式
+    prompts = convert_to_openai_history(history, txt)
+    logger.info(f"{prompts = }")
+    payload = json.dumps({"messages": prompts})
     headers = {
         'Content-Type': 'application/json'
     }
 
     if query == None and img == None:
-        return "", show_img, history, None
+        return "", history, current_img
     try:
         res = requests.request("POST", url, headers=headers, data=payload).json()
         response = res['result']
-        history.append((query, response))
+        history.append([query, response])
+        logger.info(f"{history = }")
 
-        return "", show_img, history, None
+        return "", history, current_img
     except Exception as e:
-        return e, show_img, history, None
+        return e, history, current_img
 
 
 def main() -> None:
@@ -279,22 +285,24 @@ def main() -> None:
 
         # 化验报告分析页面
         with gr.Tab("化验报告分析"):
+            # 用来存放ocr图片路径，防止重复使用ocr
+            current_img = gr.State("")
 
-            gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>
-                            """)
+            gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>""")
             with gr.Row():
-
                 img_chatbot = gr.Chatbot(height=450, show_copy_button=True)
-                img_show = gr.Image(label="输入的化验报告图片", height=450)
+                img_show = gr.Image(sources=["upload", "webcam", "clipboard"], type="filepath", label="输入的化验报告图片", height=450)
 
             with gr.Row():
                 question = gr.Textbox(label="Prompt/问题", scale=2)
-                img_intput = gr.UploadButton('📁', elem_id='upload', file_types=['image'], scale=0)
+                # img_intput = gr.UploadButton('📁', elem_id='upload', file_types=['image'], scale=0)
                 # print(img_intput.name)
-                subbt = gr.Button(value="Chat", scale=0)
+                subbt = gr.Button(value="Chat", variant="primary", scale=0)
+                # 创建一个清除按钮，用于清除聊天机器人组件的内容。
+                clear = gr.ClearButton(components=[img_chatbot, img_show, current_img], value="Clear", variant="stop", scale=0)
 
-        subbt.click(ocr_chat, inputs=[img_intput, question, img_chatbot], outputs=[question, img_show, img_chatbot, img_intput])
-        question.submit(ocr_chat, inputs=[img_intput, question, img_chatbot], outputs=[question, img_show, img_chatbot, img_intput])
+        subbt.click(ocr_chat, inputs=[img_show, question, img_chatbot, current_img], outputs=[question, img_chatbot, current_img])
+        question.submit(ocr_chat, inputs=[img_show, question, img_chatbot, current_img], outputs=[question, img_chatbot, current_img])
 
 
         # 智能问答页面

@@ -15,6 +15,7 @@ from tencentcloud.ocr.v20181119 import ocr_client, models
 
 # https://blog.csdn.net/weixin_30347335/article/details/95849160
 
+
 def get_file_content_as_base64(path, urlencoded=False):
     """
     获取文件base64编码
@@ -51,7 +52,7 @@ def ocr_detection(img, secret_id, secret_key):
         #     "ImageUrl": "ImageUrl"
         # }
         # req.from_json_string(json.dumps(params))
-        req.ImageBase64 = get_file_content_as_base64(img.name)
+        req.ImageBase64 = get_file_content_as_base64(img)
 
         # 返回的resp是一个RecognizeTableAccurateOCRResponse的实例，与请求对象对应
         resp = client.RecognizeTableAccurateOCR(req)
@@ -85,68 +86,97 @@ def get_ernie_access_token(ernie_api_key, ernie_secret_key):
     return str(requests.post(url, params=params).json().get("access_token"))
 
 
-# def ocr_chat(img, query, history:list):
-#     txt = ocr_detection(img, ocr_secret_id, ocr_secret_key) + "," + query if img != None else query
-#     show_img = cv2.imread(img.name) if img!= None else None
+# def ocr_chat(img, query, history: list, current_img: str):
+#     print(f"{img = }")
+#     print(f"{current_img = }")
 
+#     # 有图片且图片不是之前的图片才使用ocr
+#     if img != None and img != current_img:
+#         print(f"use ocr")
+#         ocr_result: str = ocr_detection(img, ocr_secret_id, ocr_secret_key)
+#         txt = f"图片ocr检测结果:\n<ocr>\n{ocr_result}\n</ocr>\n question: {query}"
+#         current_img = img
+#     else:
+#         txt = query
+#     print(f"{txt = }")
 
 #     url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-speed-128k?access_token=" + get_ernie_access_token(ernie_api_key, ernie_secret_key)
+
+#     # 将历史记录转换为openai格式
+#     prompts = convert_to_openai_history(history, txt)
+#     print(f"{prompts = }")
 #     # 注意message必须是奇数条
-#     payload = json.dumps({
-#     "messages": [
-#         {
-#             "role": "user",
-#             "content": txt,
-#         }
-#     ]
-#     })
+#     payload = json.dumps({"messages": prompts})
 #     headers = {
 #         'Content-Type': 'application/json'
 #     }
 
 #     if query == None and img == None:
-#         return "", show_img, history, None
+#         return "", history, current_img
 #     try:
 #         res = requests.request("POST", url, headers=headers, data=payload).json()
 #         response = res['result']
-#         history.append((query, response))
+#         history.append([query, response])
+#         print(f"{history = }")
 
-#         return "", show_img, history, None
+#         return "", history, current_img
 #     except Exception as e:
-#         return e, show_img, history, None
+#         return e, history, current_img
 
 
-# def main():
-#     # 创建一个 Web 界面
+# def main() -> None:
 #     block = gr.Blocks()
 #     with block as demo:
+#         state_session_id = gr.State(0)
+
+#         with gr.Row(equal_height=True):
+#             with gr.Column(scale=15):
+#                 gr.Markdown("""<h1><center>Healthcare Agent</center></h1>""")
+#             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
+
 
 #         # 化验报告分析页面
 #         with gr.Tab("化验报告分析"):
-#             gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>
-#                             """)
+#             # 用来存放ocr图片路径，防止重复使用ocr
+#             current_img = gr.State("")
+
+#             gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>""")
 #             with gr.Row():
 
 #                 img_chatbot = gr.Chatbot(height=450, show_copy_button=True)
-#                 img_show = gr.Image(label="输入的化验报告图片", height=450)
+#                 img_show = gr.Image(sources=["upload", "webcam", "clipboard"], type="filepath", label="输入的化验报告图片", height=450)
 
 #             with gr.Row():
 #                 question = gr.Textbox(label="Prompt/问题", scale=2)
-#                 img_intput = gr.UploadButton('📁', elem_id='upload', file_types=['image'], scale=0)
+#                 # img_intput = gr.UploadButton('📁', elem_id='upload', file_types=['image'], scale=0)
 #                 # print(img_intput.name)
-#                 subbt = gr.Button(value="Chat", scale=0)
+#                 subbt = gr.Button(value="Chat", variant="primary", scale=0)
+#                 # 创建一个清除按钮，用于清除聊天机器人组件的内容。
+#                 clear = gr.ClearButton(components=[img_chatbot, img_show, current_img], value="Clear", variant="stop", scale=0)
 
+#         subbt.click(ocr_chat, inputs=[img_show, question, img_chatbot, current_img], outputs=[question, img_chatbot, current_img])
+#         question.submit(ocr_chat, inputs=[img_show, question, img_chatbot, current_img], outputs=[question, img_chatbot, current_img])
 
-#         subbt.click(ocr_chat, inputs=[img_intput, question, img_chatbot], outputs=[question, img_show, img_chatbot, img_intput])
-#         question.submit(ocr_chat, inputs=[img_intput, question, img_chatbot], outputs=[question, img_show, img_chatbot, img_intput])
 
 #         # 智能问答页面
-#         with gr.Tab("智能问答"):
-#             chatbot2 = gr.Chatbot(height=450, show_copy_button=True)
+#         with gr.Tab("医疗智能问答"):
+#             ...
 
+#         gr.Markdown("""
+#         ### 内容由 AI 大模型生成，不构成专业医疗意见或诊断。
+#         """)
+
+#     # threads to consume the request
 #     gr.close_all()
-#     # 直接启动
-#     demo.launch()
+
+#     # 设置队列启动
+#     demo.queue(
+#         max_size = None,                # If None, the queue size will be unlimited.
+#         default_concurrency_limit = 40  # 最大并发限制
+#     )
+
+#     # demo.launch(server_name = "127.0.0.1", server_port = 7860, share = True, max_threads = 40)
+#     demo.launch(max_threads = 40)
 
 
 # if __name__ == "__main__":
