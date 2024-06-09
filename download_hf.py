@@ -18,9 +18,14 @@ endpoint = "https://hf-mirror.com"
 proxies = {"https": "http://localhost:7897"}
 
 
+EMBEDDING_MODEL_PATH: str = "./models/bce-embedding-base_v1"
+RERANKER_MODEL_PATH: str = "./models/bce-reranker-base_v1"
+MODEL_PATH = "./models/internlm2-chat-1_8b"
+
+
 snapshot_download(
     repo_id = "maidalun1020/bce-embedding-base_v1",
-    local_dir = "./models/bce-embedding-base_v1",
+    local_dir = EMBEDDING_MODEL_PATH,
     # proxies = proxies,
     max_workers = 8,
     # endpoint = endpoint,
@@ -29,7 +34,7 @@ snapshot_download(
 
 snapshot_download(
     repo_id = "maidalun1020/bce-reranker-base_v1",
-    local_dir = "./models/bce-reranker-base_v1",
+    local_dir = RERANKER_MODEL_PATH,
     # proxies = proxies,
     max_workers = 8,
     # endpoint = endpoint,
@@ -38,7 +43,7 @@ snapshot_download(
 
 snapshot_download(
     repo_id = "internlm/internlm2-chat-1_8b",
-    local_dir = "./models/internlm2-chat-1_8b",
+    local_dir = MODEL_PATH,
     # proxies = proxies,
     max_workers = 8,
     # endpoint = endpoint,
