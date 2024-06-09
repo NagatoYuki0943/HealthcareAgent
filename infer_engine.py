@@ -4,12 +4,19 @@ from typing import Generator, AsyncGenerator, Literal, Sequence, Any
 import torch
 from torch import Tensor
 import transformers
-from transformers import AutoTokenizer, AutoProcessor, AutoModelForCausalLM
+from transformers import (
+    AutoTokenizer,
+    PreTrainedTokenizer,
+    PreTrainedTokenizerFast,
+    AutoProcessor,
+    AutoModelForCausalLM,
+)
 from transformers.generation.streamers import BaseStreamer
 from threading import Thread
 from queue import Empty, Queue
 import asyncio
 import random
+import re
 from loguru import logger
 from templates import get_prompt_template
 from utils import random_uuid_int
@@ -161,7 +168,8 @@ class TransfomersEngine(DeployEngine):
         self.config = config
 
         # tokenizer
-        self.tokenizer: AutoTokenizer = AutoTokenizer.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
+        self.tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast = \
+            AutoTokenizer.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
 
         # processor: Multimodal tasks require a processor that combines two types of preprocessing tools.
         self.processor: AutoProcessor = AutoProcessor.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
@@ -178,6 +186,7 @@ class TransfomersEngine(DeployEngine):
         )
 
         # 创建模型
+        logger.info('AutoModelForCausalLM loading...')
         self.model = AutoModelForCausalLM.from_pretrained(
             config.pretrained_model_name_or_path,
             torch_dtype = torch.bfloat16,
@@ -186,15 +195,17 @@ class TransfomersEngine(DeployEngine):
             low_cpu_mem_usage = True,   # 是否使用低CPU内存,使用 device_map 参数必须为 True
             quantization_config = quantization_config if config.load_in_8bit or config.load_in_4bit else None,
         )
+        logger.success(f'AutoModelForCausalLM load successfully: {config.pretrained_model_name_or_path}')
 
         if config.adapter_path:
             from peft.peft_model import PeftModel
-            logger.info(f"load adapter: {config.adapter_path}")
+            logger.info('PeftModel loading adapter...')
             # 2种加载adapter的方式
             # 1. load adapter https://huggingface.co/docs/transformers/main/zh/peft
             # self.model.load_adapter(adapter_path)
             # 2. https://huggingface.co/docs/peft/main/en/package_reference/peft_model#peft.PeftModel.from_pretrained
             self.model: PeftModel = PeftModel.from_pretrained(self.model, config.adapter_path)
+            logger.success(f"PeftModel load adapter successfully: {config.adapter_path}")
 
         self.model.eval()
 
@@ -219,7 +230,7 @@ class TransfomersEngine(DeployEngine):
     ) -> tuple[str, Sequence]:
         history = [] if history is None else list(history)
 
-        if tokenizer.add_bos_token:
+        if hasattr(tokenizer, 'add_bos_token') and tokenizer.add_bos_token:
             prompt = ""
         else:
             prompt = tokenizer.bos_token
@@ -250,7 +261,7 @@ class TransfomersEngine(DeployEngine):
         suffix: str = self.prompt_template.get('SUFFIX', "")
         sep: str = self.prompt_template.get('SEP', '\n')
 
-        if tokenizer.add_bos_token:
+        if hasattr(tokenizer, 'add_bos_token') and tokenizer.add_bos_token:
             prompt: str = ""
         else:
             prompt: str = tokenizer.bos_token
@@ -301,7 +312,8 @@ class TransfomersEngine(DeployEngine):
         )
         outputs = outputs[0].cpu().tolist()[len(inputs["input_ids"][0]) :]
         response: str = tokenizer.decode(outputs, skip_special_tokens=True)
-        response = response.split("<|im_end|>")[0]
+        # response = response.split("<|im_end|>")[0]
+        response = re.split("|".join(self.stop_words), response)[0]
         history = history + [(query, response)]
         return response, history
 
