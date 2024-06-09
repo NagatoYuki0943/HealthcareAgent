@@ -14,7 +14,7 @@ import requests
 from loguru import logger
 from infer_engine import InferEngine, LmdeployConfig, convert_to_openai_history
 from vector_database import VectorDatabase
-from huggingface_hub import hf_hub_download, snapshot_download
+from modelscope import snapshot_download
 from utils import remove_history_references, download_openxlab_dataset
 from ocr_chat import get_ernie_access_token, ocr_detection
 
@@ -38,10 +38,8 @@ powershell:
 
 """
 # 获取环境变量
-hf_token = os.getenv("HF_TOKEN", "")
 openxlab_access_key = os.getenv("OPENXLAB_AK", "")
 openxlab_secret_key = os.getenv("OPENXLAB_SK", "")
-print(f"{hf_token = }")
 print(f"{openxlab_access_key = }")
 print(f"{openxlab_secret_key = }")
 
@@ -67,16 +65,12 @@ ALLOW_SUFFIX: tuple[str] = (".txt", ".md", ".docx", ".doc", ".pdf")
 
 # 下载 embedding 和 reranker 模型,不会重复下载
 snapshot_download(
-    repo_id = "maidalun1020/bce-embedding-base_v1",
+    "maidalun/bce-embedding-base_v1",
     local_dir = EMBEDDING_MODEL_PATH,
-    max_workers = 8,
-    token = hf_token
 )
 snapshot_download(
-    repo_id = "maidalun1020/bce-reranker-base_v1",
+    "maidalun/bce-reranker-base_v1",
     local_dir = RERANKER_MODEL_PATH,
-    max_workers = 8,
-    token = hf_token
 )
 
 # 下载数据集,不会重复下载

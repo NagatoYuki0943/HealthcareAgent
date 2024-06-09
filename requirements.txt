@@ -1,5 +1,6 @@
 gradio>4.0.0 # 不支持 3.x 版本
 huggingface_hub
+modelscope
 transformers
 peft
 sentence-transformers
