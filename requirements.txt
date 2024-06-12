@@ -1,5 +1,5 @@
 gradio>4.0.0 # 不支持 3.x 版本
-huggingface_hub>=0.23.3
+huggingface-hub>=0.23.3
 modelscope>=1.15.0
 transformers==4.36.2
 peft==0.9.0
@@ -12,6 +12,7 @@ accelerate>=0.31.0
 tiktoken>=0.7.0
 langchain==0.1.20 # 指定版本，否则openxlab上会下载全部版本,langchain 0.2.0 版本在 openxlab 上会爆显存,原因不明
 langchain-community==0.0.38 # 指定版本，否则openxlab上会下载全部版本
+langchain-huggingface>=0.0.3
 chromadb>=0.5.0 # 指定版本，否则openxlab上会下载全部版本
 pysqlite3-binary>=0.5.2.post3
 faiss-cpu>=1.8.0

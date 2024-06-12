@@ -1,3 +1,4 @@
+import os
 from langchain_core.documents import Document
 from langchain_community.document_loaders import (
     UnstructuredFileLoader,
@@ -7,9 +8,8 @@ from langchain_community.document_loaders import (
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
-import os
 from loguru import logger
 from utils import get_filename, format_documents, format_references, hashfile
 
@@ -141,7 +141,7 @@ class VectorDatabase:
 
         # 对文本进行分块
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size = 768,
+            chunk_size = 512,
             chunk_overlap = 32
         )
         split_docs = text_splitter.split_documents(docs)
