@@ -1,5 +1,5 @@
 gradio>4.0.0 # 不支持 3.x 版本
-huggingface_hub
+huggingface-hub
 modelscope
 transformers
 peft
@@ -12,6 +12,7 @@ accelerate
 tiktoken
 langchain
 langchain-community
+langchain-huggingface
 chromadb
 pysqlite3-binary
 faiss-cpu
