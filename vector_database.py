@@ -8,7 +8,8 @@ from langchain_community.document_loaders import (
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
+# from langchain_huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 from loguru import logger
 from utils import get_filename, format_documents, format_references, hashfile
