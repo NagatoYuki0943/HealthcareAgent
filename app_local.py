@@ -146,7 +146,6 @@ def chat(
 
 
 def regenerate(
-    query: str,
     history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
     max_new_tokens: int = 1024,
     temperature: float = 0.8,
@@ -272,8 +271,8 @@ def main() -> None:
                 # 清空query
                 query.submit(
                     lambda: gr.Textbox(value=""),
-                    [],
-                    [query],
+                    inputs=[],
+                    outputs=[query],
                 )
 
                 # 按钮提交
@@ -286,14 +285,14 @@ def main() -> None:
                 # 清空query
                 submit.click(
                     lambda: gr.Textbox(value=""),
-                    [],
-                    [query],
+                    inputs=[],
+                    outputs=[query],
                 )
 
                 # 重新生成
                 regen.click(
                     regenerate,
-                    inputs=[query, chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
+                    inputs=[chatbot, max_new_tokens, temperature, top_p, top_k, state_session_id],
                     outputs=[chatbot]
                 )
 
