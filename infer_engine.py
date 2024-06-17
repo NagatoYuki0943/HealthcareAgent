@@ -313,7 +313,9 @@ class TransfomersEngine(DeployEngine):
         outputs = outputs[0].cpu().tolist()[len(inputs["input_ids"][0]) :]
         response: str = tokenizer.decode(outputs, skip_special_tokens=True)
         # response = response.split("<|im_end|>")[0]
-        response = re.split("|".join(self.stop_words), response)[0]
+        # 防止 <|im_end|> 中的 | 干扰正则表达式匹配
+        stop_words = [re.escape(stop_word) for stop_word in self.stop_words]
+        response = re.split("|".join(stop_words), response)[0]
         history = history + [(query, response)]
         return response, history
 
