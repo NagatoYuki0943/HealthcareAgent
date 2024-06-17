@@ -171,6 +171,15 @@ class TransfomersEngine(DeployEngine):
         self.tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast = \
             AutoTokenizer.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
 
+        # 获取对话模板
+        self.prompt_template: dict = get_prompt_template(config.model_name)
+        # 停止词
+        self.stop_words: list[str] = [self.tokenizer.eos_token] + self.prompt_template.get('STOP_WORDS', [])
+        logger.info(f"stop_words: {self.stop_words}")
+        # 停止id
+        self.stop_ids: list[int] = self.tokenizer.convert_tokens_to_ids(self.stop_words)
+        logger.info(f"stop_ids: {self.stop_ids}")
+
         # processor: Multimodal tasks require a processor that combines two types of preprocessing tools.
         self.processor: AutoProcessor = AutoProcessor.from_pretrained(config.pretrained_model_name_or_path, trust_remote_code = True)
 
@@ -210,15 +219,6 @@ class TransfomersEngine(DeployEngine):
         self.model.eval()
 
         logger.info(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
-
-        # 获取对话模板
-        self.prompt_template: dict = get_prompt_template(config.model_name)
-        # 停止词
-        self.stop_words: list[str] = [self.tokenizer.eos_token] + self.prompt_template.get('STOP_WORDS', [])
-        logger.info(f"stop_words: {self.stop_words}")
-        # 停止id
-        self.stop_ids: list[int] = self.tokenizer.convert_tokens_to_ids(self.stop_words)
-        logger.info(f"stop_ids: {self.stop_ids}")
 
     # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1136-L1146
     def build_inputs(
@@ -367,6 +367,9 @@ class TransfomersEngine(DeployEngine):
 
                 self.cache.extend(value.tolist())
                 token: str = self.tokenizer.decode(self.cache, skip_special_tokens=True)
+                # pervent decode error
+                if "�" in token:
+                    return
                 # if token.strip() != "<|im_end|>":
                 if token.strip() not in stop_words:
                     self.response: str = self.response + token
