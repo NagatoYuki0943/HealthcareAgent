@@ -127,6 +127,7 @@ def chat(
     history_without_reference = remove_history_references(history = history)
     logger.info(f"history_without_reference: {history_without_reference}")
 
+    yield history + [[query, None]]
     for response, _history in infer_engine.chat_stream(
         query = prompt,
         history = history_without_reference,
