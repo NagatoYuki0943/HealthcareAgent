@@ -154,6 +154,8 @@ class VectorDatabase:
 
         # 将加载的向量数据库持久化到磁盘上
         self.vectordb.save_local(folder_path = self.persist_directory)
+        # 清除未使用缓存
+        torch.cuda.empty_cache()
 
     def load_faiss_vectordb(self) -> None:
         """载入数据库"""
@@ -169,6 +171,8 @@ class VectorDatabase:
             distance_strategy = DistanceStrategy.MAX_INNER_PRODUCT,  # refer: https://github.com/InternLM/HuixiangDou/blob/main/huixiangdou/service/retriever.py
             normalize_L2 = False
         )
+        # 清除未使用缓存
+        torch.cuda.empty_cache()
 
     def create_faiss_retriever(self) -> None:
         """创建 Retriever"""
@@ -220,6 +224,8 @@ class VectorDatabase:
 
         # similarity search
         documents: list[Document] = self.retriever.invoke(query)
+        # 清除未使用缓存
+        torch.cuda.empty_cache()
         documents_str: str = format_documents(documents)
         # 获取参考文档并去重
         references = list(set([get_filename(doc.metadata['source']) for doc in documents]))
