@@ -10,9 +10,9 @@ sentencepiece>=0.2.0
 einops>=0.8.0
 accelerate>=0.31.0
 tiktoken>=0.7.0
-langchain==0.1.20 # 指定版本，否则openxlab上会下载全部版本,langchain 0.2.0 版本在 openxlab 上会爆显存,原因不明
-langchain-community==0.0.38 # 指定版本，否则openxlab上会下载全部版本
-# langchain-huggingface>=0.0.3
+langchain==0.2.6 # 指定版本，否则openxlab上会下载全部版本,langchain 0.2.0 版本在 openxlab 上会爆显存,原因不明
+langchain-community==0.2.6 # 指定版本，否则openxlab上会下载全部版本
+langchain-huggingface>=0.0.3
 chromadb>=0.5.0 # 指定版本，否则openxlab上会下载全部版本
 pysqlite3-binary>=0.5.2.post3
 faiss-cpu>=1.8.0
