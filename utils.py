@@ -49,10 +49,12 @@ def format_references(references: list[str]) -> str:
 
 
 def remove_history_references(history: list) -> list:
+    split_words = ["\n*no reference.*", "\nreferences:"]
+    split_words = [re.escape(word) for word in split_words]
     new_history = []
     for prompt, response in history:
         # 按照参考说明拆分,只保留拆分前的内容
-        response_no_reference = re.split(r"\n\*no reference\.\*|\nreferences:", response)[0]
+        response_no_reference = re.split("|".join(split_words), response)[0]
         new_history.append([prompt, response_no_reference])
     return new_history
 
