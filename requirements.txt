@@ -20,7 +20,7 @@ pypdf>=4.2.0
 unstructured>=0.14.4 # txt,md,doc,docx # 指定版本，否则openxlab上会下载全部版本
 python-docx>=1.1.2 # doc,docx
 lmdeploy>=0.4.2
-openxlab==0.0.38 # 不兼容openxlab默认版本
+openxlab==0.1.0 # 不兼容openxlab默认版本
 loguru>=0.7.2
 openai>=1.32.0
 opencv-python>=4.10.0.82
