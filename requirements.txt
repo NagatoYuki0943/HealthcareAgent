@@ -1,7 +1,7 @@
 gradio>4.0.0 # 不支持 3.x 版本
 huggingface-hub>=0.23.3
 modelscope>=1.15.0
-transformers>=4.41.2
+transformers
 peft>=0.9.0
 sentence-transformers>=3.0.0
 bcembedding>=0.1.5
@@ -12,16 +12,16 @@ accelerate>=0.31.0
 tiktoken>=0.7.0
 langchain==0.2.6 # 指定版本，否则openxlab上会下载全部版本,langchain 0.2.0 版本在 openxlab 上会爆显存,原因不明
 langchain-community==0.2.6 # 指定版本，否则openxlab上会下载全部版本
-langchain-huggingface>=0.0.3
+# langchain-huggingface>=0.0.3
 chromadb>=0.5.0 # 指定版本，否则openxlab上会下载全部版本
 pysqlite3-binary>=0.5.2.post3
 faiss-cpu>=1.8.0
 pypdf>=4.2.0
-unstructured>=0.14.4 # txt,md,doc,docx # 指定版本，否则openxlab上会下载全部版本
+unstructured>=0.14.8 # txt,md,doc,docx # 指定版本，否则openxlab上会下载全部版本
 python-docx>=1.1.2 # doc,docx
 lmdeploy>=0.4.2
 openxlab==0.1.0 # 不兼容openxlab默认版本
 loguru>=0.7.2
-openai>=1.32.0
-opencv-python>=4.10.0.82
-tencentcloud-sdk-python>=3.0.1161
+openai>=1.35.4
+opencv-python>=4.10.0.84
+tencentcloud-sdk-python>=3.0.1176
