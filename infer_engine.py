@@ -936,7 +936,8 @@ class LmdeployServeEngine(LmdeployEngine):
         from lmdeploy.serve.openai.api_client import APIClient
 
         # 启动服务
-        # https://lmdeploy.readthedocs.io/zh-cn/latest/serving/api_server.html
+        # https://github.com/InternLM/lmdeploy/blob/main/docs/zh_cn/serving/api_server.md
+        # https://github.com/InternLM/lmdeploy/blob/main/docs/zh_cn/serving/api_server_vl.md
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_server.py
         serve(
@@ -963,6 +964,111 @@ class LmdeployServeEngine(LmdeployEngine):
             api_key = self.api_key
         )
 
+    def chat_completions_v1(
+        self,
+        query: str,
+        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        max_new_tokens: int = 1024,
+        temperature: float = 0.8,
+        top_p: float = 0.8,
+        top_k: int = 40,
+        session_id: int | None = None,
+        stream: bool = True,
+        **kwargs,
+    ) -> Generator[tuple[str, Sequence], None, None]:
+        # session_id
+        session_id = random_uuid_int() if session_id is None else session_id
+        logger.info(f"{session_id = }")
+
+        logger.info("gen_config: {}".format({
+            "max_new_tokens": max_new_tokens,
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+        }))
+
+        # 将历史记录转换为openai格式
+        prompt = convert_to_openai_history(history, query)
+
+        logger.info(f"query: {query}")
+        response_text: str = ""
+        response: dict
+        for response in self.api_client.chat_completions_v1(
+            model = self.config.model_name,
+            messages = prompt,
+            temperature = temperature,
+            top_p = top_p,
+            top_k = top_k, # add
+            n = 1,
+            max_tokens = max_new_tokens,
+            stop = None,
+            stream = stream,
+            presence_penalty = 0.0,
+            frequency_penalty = 0.0,
+            user = None,
+            repetition_penalty = 1.0,
+            session_id = session_id,
+            ignore_eos = False,
+            skip_special_tokens = True,
+            adapter_name = None, # add
+        ):
+            logger.info(f"response: {response}")
+            # stream = True
+            # {
+            #     'id': '1',
+            #     'object': 'chat.completion.chunk',
+            #     'created': 1719492081,
+            #     'model': 'internlm2',
+            #     'choices': [
+            #         {
+            #             'index': 0,
+            #             'delta': {
+            #                 'role': 'assistant',
+            #                 'content': '我是'
+            #             },
+            #             'logprobs': None,
+            #             'finish_reason': None
+            #         }
+            #     ]
+            # }
+
+            # stream = False
+            # {
+            #     'id': '1',
+            #     'object': 'chat.completion',
+            #     'created': 1719493399,
+            #     'model': 'internlm2',
+            #     'choices': [
+            #         {
+            #             'index': 0,
+            #             'message': {
+            #                 'role': 'assistant',
+            #                 'content': '我是书生·浦语，一个基于语言模型的AI助手。我是由上海人工智能实验室开发，旨在帮助用户解决问题、提供信息并回答各种问题。'
+            #             },
+            #             'logprobs': None,
+            #             'finish_reason': 'stop'
+            #         }
+            #     ],
+            #     'usage': {
+            #         'prompt_tokens': 104,
+            #         'total_tokens': 138,
+            #         'completion_tokens': 34
+            #     }
+            # }
+
+            if stream:
+                _response_text = response['choices'][0]['delta']['content']
+            else:
+                _response_text = response['choices'][0]['message']['content']
+            if not _response_text:
+                continue
+
+            response_text += _response_text
+            yield response_text, history + [[query, response_text]]
+
+        logger.info(f"response_text: {response_text}")
+        logger.info(f"history: {history + [[query, response_text]]}")
+
     def chat_interactive_v1(
         self,
         query: str,
@@ -979,9 +1085,6 @@ class LmdeployServeEngine(LmdeployEngine):
         session_id = random_uuid_int() if session_id is None else session_id
         logger.info(f"{session_id = }")
 
-        # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(history, query)
-
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -989,11 +1092,15 @@ class LmdeployServeEngine(LmdeployEngine):
             "top_k": top_k,
         }))
 
+        # 将历史记录转换为openai格式
+        prompt = convert_to_openai_history(history, query)
+
         logger.info(f"query: {query}")
         response_text: str = ""
         response: dict
         for response in self.api_client.chat_interactive_v1(
             prompt = prompt,
+            image_url = None,
             session_id = session_id,
             interactive_mode = False,
             stream = stream,                     # 是否使用流式传输
@@ -1008,7 +1115,13 @@ class LmdeployServeEngine(LmdeployEngine):
             adapter_name = None,
         ):
             logger.info(f"response: {response}")
-            response_text += response.get("text", "")
+            # {'text': '我可以', 'tokens': 1, 'input_tokens': 179, 'history_tokens': 0, 'finish_reason': None}
+
+            _response_text = response.get("text", "")
+            if not _response_text:
+                continue
+
+            response_text += _response_text
             yield response_text, history + [[query, response_text]]
 
         logger.info(f"response_text: {response_text}")
@@ -1026,7 +1139,7 @@ class LmdeployServeEngine(LmdeployEngine):
         **kwargs,
     ) -> tuple[str, Sequence]:
         # 将 generator 转换为 list,返回第一次输出
-        return list(self.chat_interactive_v1(
+        return list(self.chat_completions_v1(
             query = query,
             history = history,
             max_new_tokens = max_new_tokens,
@@ -1049,7 +1162,7 @@ class LmdeployServeEngine(LmdeployEngine):
         session_id: int | None = None,
         **kwargs,
     ) -> Generator[tuple[str, Sequence], None, None]:
-        return self.chat_interactive_v1(
+        return self.chat_completions_v1(
             query = query,
             history = history,
             max_new_tokens = max_new_tokens,
