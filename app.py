@@ -130,7 +130,7 @@ LMDEPLOY_CONFIG = LmdeployConfig(
     cache_max_entry_count = 0.1,    # 调整 KV Cache 的占用比例为0.1
     quant_policy = 0,               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     system_prompt = SYSTEM_PROMPT,
-    deploy_method = 'local'
+    deploy_method = 'serve'
 )
 
 # 载入模型
