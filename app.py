@@ -12,9 +12,11 @@ import cv2
 import json
 import requests
 from loguru import logger
-from infer_engine import InferEngine, LmdeployConfig, convert_to_openai_history
-from vector_database import VectorDatabase
+from shutil import rmtree
 from modelscope import snapshot_download
+
+from vector_database import VectorDatabase
+from infer_engine import InferEngine, LmdeployConfig, convert_to_openai_history
 from utils import remove_history_references, download_openxlab_dataset
 from ocr_chat import get_ernie_access_token, ocr_detection
 
@@ -103,6 +105,9 @@ vector_database.create_faiss_reranker_retriever()
 
 # 模型
 MODEL_PATH = "./models/internlm2-chat-7b"
+# 也许可以解决openxlab的重启错误
+if os.path.exists(MODEL_PATH):
+    rmtree(MODEL_PATH)
 os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b {MODEL_PATH}')
 os.system(f'cd {MODEL_PATH} && git lfs pull')
 
