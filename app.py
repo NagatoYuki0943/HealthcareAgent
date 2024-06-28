@@ -106,10 +106,9 @@ vector_database.create_faiss_reranker_retriever()
 # 模型
 MODEL_PATH = "./models/internlm2-chat-7b"
 # 也许可以解决openxlab的重启错误
-if os.path.exists(MODEL_PATH):
-    rmtree(MODEL_PATH)
-os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b {MODEL_PATH}')
-os.system(f'cd {MODEL_PATH} && git lfs pull')
+if not os.path.exists(MODEL_PATH):
+    os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-7b {MODEL_PATH}')
+    os.system(f'cd {MODEL_PATH} && git lfs pull')
 
 SYSTEM_PROMPT = """
 你是医疗保健智能体，名字叫做 "HeathcareAgent"。
