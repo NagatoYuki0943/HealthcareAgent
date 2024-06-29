@@ -9,7 +9,8 @@ from langchain_community.document_loaders import (
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
+# from langchain_huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 from loguru import logger
 from utils import get_filename, format_documents, format_references, hashfile
@@ -25,6 +26,7 @@ class VectorDatabase:
         similarity_top_k: int = 5,
         score_threshold: float = 0.15,
         allow_suffix: tuple[str] | str = (".txt", ".md", ".docx", ".doc", ".pdf"),
+        device: str = 'cuda',
     ) -> None:
         """
         Args:
@@ -35,6 +37,7 @@ class VectorDatabase:
             similarity_top_k (int, optional): 相似数据 top_k. Defaults to 5.
             score_threshold (float, optional): 最低分数. Defaults to 0.15.
             allow_suffix (tuple[str] | str, optional): 读取文件的后缀. Defaults to (".txt", ".md", ".docx", ".doc", ".pdf").
+            device (str, optional): embedding 和 reranker 模型使用的设备, 比如 [cuda, cuda:0, cpu]. Defaults cuda.
         """
         self.data_path = data_path
         self.persist_directory = persist_directory
@@ -43,11 +46,12 @@ class VectorDatabase:
         self.similarity_top_k = similarity_top_k
         self.score_threshold = score_threshold
         self.allow_suffix = allow_suffix
+        self.device = device
 
         # 加载开源词向量模型
         self.embeddings = HuggingFaceEmbeddings(
             model_name = embedding_model_path,
-            model_kwargs = {'device': 'cuda'},
+            model_kwargs = {'device': self.device},
             encode_kwargs = {
                 'normalize_embeddings': True
             }
@@ -211,7 +215,7 @@ class VectorDatabase:
         reranker = BCERerank(
             top_n = self.similarity_top_k,
             model = self.reranker_model_path,
-            device = 'cuda',
+            device = self.device,
             use_fp16 = True
         )
 
