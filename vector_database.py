@@ -55,6 +55,8 @@ class VectorDatabase:
         )
         self.embeddings.client = self.embeddings.client.half()
         self.retriever = None
+        # 清除未使用缓存
+        torch.cuda.empty_cache()
 
     def get_files(self, dir_path: str) -> list[str]:
         """遍历文件夹获取所有目标文件路径
@@ -187,6 +189,8 @@ class VectorDatabase:
                 "fetch_k": self.similarity_top_k * 5
             }
         )
+        # 清除未使用缓存
+        torch.cuda.empty_cache()
 
     def create_faiss_reranker_retriever(self) -> None:
         """创建重排序 Retriever"""
@@ -217,6 +221,8 @@ class VectorDatabase:
             base_compressor = reranker,
             base_retriever = retriever
         )
+        # 清除未使用缓存
+        torch.cuda.empty_cache()
 
     def similarity_search(
         self,
