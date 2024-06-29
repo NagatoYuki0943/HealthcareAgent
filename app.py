@@ -92,7 +92,7 @@ vector_database = VectorDatabase(
     similarity_top_k = SIMILARITY_TOP_K,
     score_threshold = SCORE_THRESHOLD,
     allow_suffix = ALLOW_SUFFIX,
-    device = 'cuda',
+    device = 'cpu',
 )
 # 创建数据库
 vector_database.create_faiss_vectordb(force=True)
@@ -132,7 +132,7 @@ LMDEPLOY_CONFIG = LmdeployConfig(
     backend = 'turbomind',
     model_name = 'internlm2',
     model_format = 'hf',
-    cache_max_entry_count = 0.15,
+    cache_max_entry_count = 0.5,
     quant_policy = 0,               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
     system_prompt = SYSTEM_PROMPT,
     deploy_method = 'local'
