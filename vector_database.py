@@ -56,7 +56,8 @@ class VectorDatabase:
                 'normalize_embeddings': True
             }
         )
-        self.embeddings.client = self.embeddings.client.half()
+        if 'cuda' in self.device:
+            self.embeddings.client = self.embeddings.client.half()
         self.retriever = None
         # 清除未使用缓存
         torch.cuda.empty_cache()
@@ -216,7 +217,7 @@ class VectorDatabase:
             top_n = self.similarity_top_k,
             model = self.reranker_model_path,
             device = self.device,
-            use_fp16 = True
+            use_fp16 = True if 'cuda' in self.device else False
         )
 
         # 创建检索器
@@ -246,7 +247,7 @@ class VectorDatabase:
 
 if __name__ == "__main__":
     vector_database = VectorDatabase()
-    vector_database.create_faiss_vectordb(force=True)
+    vector_database.create_faiss_vectordb(force=False)
     vector_database.load_faiss_vectordb()
     vector_database.create_faiss_retriever()
     documents_str, references_str = vector_database.similarity_search("Eye Pressure Lowering Effect of Vitamin C")
