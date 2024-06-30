@@ -95,7 +95,7 @@ vector_database = VectorDatabase(
     device = 'cuda',
 )
 # 创建数据库
-vector_database.create_faiss_vectordb(force=True)
+vector_database.create_faiss_vectordb(force=False)
 # 载入数据库(创建数据库后不需要载入也可以)
 vector_database.load_faiss_vectordb()
 # 创建相似度 retriever
