@@ -1274,7 +1274,8 @@ class ApiEngine(DeployEngine):
             logger.info(f"history: {history}")
             return response, history
 
-        except:
+        except Exception as e:
+            logger.error(e)
             error_str = "对不起，无法回答您的问题，请尝试更换提问方式或者换个问题。"
             logger.error(error_str)
             return error_str, history + [query, error_str]
@@ -1362,7 +1363,8 @@ class ApiEngine(DeployEngine):
             logger.info(f"response_text: {response_text}")
             logger.info(f"history: {history + [[query, response_text]]}")
 
-        except:
+        except Exception as e:
+            logger.error(e)
             error_str = "对不起，无法回答您的问题，请尝试更换提问方式或者换个问题。"
             logger.error(error_str)
             yield error_str, history + [query, error_str]
