@@ -590,6 +590,7 @@ class LmdeployLocalEngine(LmdeployEngine):
             chat_template_config = self.chat_template_config,
             log_level = config.log_level
         )
+        self.use_vl_engine = isinstance(self.pipe, VLAsyncEngine())
 
     # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py#L453-L528
     def __stream_infer(
@@ -825,6 +826,8 @@ class LmdeployLocalEngine(LmdeployEngine):
 
         # 将历史记录转换为openai格式
         prompt = convert_to_openai_history(history, query)
+        if self.use_vl_engine:
+            prompt = self.pipe._convert_prompts(prompt)
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
@@ -852,6 +855,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         # response = self.pipe(
         response = self.pipe.chat(
             prompt = prompt,
+            session = None,
             gen_config = gen_config,
             do_preprocess = True,
             adapter_name = None
@@ -883,6 +887,8 @@ class LmdeployLocalEngine(LmdeployEngine):
 
         # 将历史记录转换为openai格式
         prompt = convert_to_openai_history(history, query)
+        if self.use_vl_engine:
+            prompt = self.pipe._convert_prompts(prompt)
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
