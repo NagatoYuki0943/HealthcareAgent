@@ -591,6 +591,8 @@ class LmdeployLocalEngine(LmdeployEngine):
             log_level = config.log_level
         )
         self.use_vl_engine = isinstance(self.pipe, VLAsyncEngine)
+        logger.info(f"pipe: {self.pipe}")
+        logger.info(f"use_vl_engine: {self.use_vl_engine}")
 
     # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py#L453-L528
     def __stream_infer(
