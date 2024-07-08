@@ -590,7 +590,7 @@ class LmdeployLocalEngine(LmdeployEngine):
             chat_template_config = self.chat_template_config,
             log_level = config.log_level
         )
-        self.use_vl_engine = isinstance(self.pipe, VLAsyncEngine())
+        self.use_vl_engine = isinstance(self.pipe, VLAsyncEngine)
 
     # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py#L453-L528
     def __stream_infer(
