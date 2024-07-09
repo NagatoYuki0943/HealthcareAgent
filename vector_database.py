@@ -8,11 +8,13 @@ from langchain_community.document_loaders import (
     PyPDFLoader,
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from chinese_recursive_text_splitter import ChineseRecursiveTextSplitter
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_community.embeddings import HuggingFaceEmbeddings
 # from langchain_huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 from loguru import logger
+from typing import Literal
 from utils import get_filename, format_documents, format_references, hashfile
 
 
@@ -27,6 +29,7 @@ class VectorDatabase:
         score_threshold: float = 0.15,
         allow_suffix: tuple[str] | str = (".txt", ".md", ".docx", ".doc", ".pdf"),
         device: str = 'cuda',
+        text_splitter_type: Literal['RecursiveCharacterTextSplitter', 'ChineseRecursiveTextSplitter'] = 'RecursiveCharacterTextSplitter',
     ) -> None:
         """
         Args:
@@ -47,6 +50,11 @@ class VectorDatabase:
         self.score_threshold = score_threshold
         self.allow_suffix = allow_suffix
         self.device = device
+        if text_splitter_type == 'RecursiveCharacterTextSplitter':
+            self.text_splitter = RecursiveCharacterTextSplitter
+        elif text_splitter_type == 'ChineseRecursiveTextSplitter':
+            self.text_splitter = ChineseRecursiveTextSplitter
+        logger.info(f"text_splitter: {self.text_splitter}")
 
         # 加载开源词向量模型
         self.embeddings = HuggingFaceEmbeddings(
@@ -61,6 +69,8 @@ class VectorDatabase:
         self.retriever = None
         # 清除未使用缓存
         torch.cuda.empty_cache()
+
+        logger.info(f"embeddings: {self.embeddings}")
 
     def get_files(self, dir_path: str) -> list[str]:
         """遍历文件夹获取所有目标文件路径
@@ -148,7 +158,7 @@ class VectorDatabase:
         docs = self.get_text(file_list)
 
         # 对文本进行分块
-        text_splitter = RecursiveCharacterTextSplitter(
+        text_splitter = self.text_splitter(
             chunk_size = 512,
             chunk_overlap = 32
         )
@@ -164,6 +174,7 @@ class VectorDatabase:
         self.vectordb.save_local(folder_path = self.persist_directory)
         # 清除未使用缓存
         torch.cuda.empty_cache()
+        logger.info("成功建立数据库")
 
     def load_faiss_vectordb(self) -> None:
         """载入数据库"""
@@ -181,6 +192,7 @@ class VectorDatabase:
         )
         # 清除未使用缓存
         torch.cuda.empty_cache()
+        logger.info("成功载入数据库")
 
     def create_faiss_retriever(self) -> None:
         """创建 Retriever"""
@@ -195,6 +207,7 @@ class VectorDatabase:
         )
         # 清除未使用缓存
         torch.cuda.empty_cache()
+        logger.info("成功创建 Retriever")
 
     def create_faiss_reranker_retriever(self) -> None:
         """创建重排序 Retriever"""
@@ -219,6 +232,7 @@ class VectorDatabase:
             device = self.device,
             use_fp16 = True if 'cuda' in self.device else False
         )
+        logger.info(f"reranker: {reranker}")
 
         # 创建检索器
         self.retriever = ContextualCompressionRetriever(
@@ -227,6 +241,7 @@ class VectorDatabase:
         )
         # 清除未使用缓存
         torch.cuda.empty_cache()
+        logger.info("成功创建 Retriever")
 
     def similarity_search(
         self,
@@ -251,12 +266,12 @@ if __name__ == "__main__":
     vector_database.load_faiss_vectordb()
     vector_database.create_faiss_retriever()
     documents_str, references_str = vector_database.similarity_search("Eye Pressure Lowering Effect of Vitamin C")
-    logger.info(f"references_str: {references_str}")
+    print(f"references_str: {references_str}")
     documents_str, references_str = vector_database.similarity_search("吃了吗")
-    logger.info(f"references_str: {references_str}")
+    print(f"references_str: {references_str}")
 
     vector_database.create_faiss_reranker_retriever()
     documents_str, references_str = vector_database.similarity_search("Eye Pressure Lowering Effect of Vitamin C")
-    logger.info(f"references_str: {references_str}")
+    print(f"references_str: {references_str}")
     documents_str, references_str = vector_database.similarity_search("吃了吗")
-    logger.info(f"references_str: {references_str}")
+    print(f"references_str: {references_str}")
