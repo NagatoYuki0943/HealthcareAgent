@@ -77,7 +77,7 @@ snapshot_download(
 
 # 下载数据集,不会重复下载
 download_openxlab_dataset(
-    dataset_repo = 'NagatoYuki0943/FMdocs',
+    dataset_repo = 'NagatoYuki0943/PigDiseaseDataset',
     target_path = DATA_PATH,
     access_key = openxlab_access_key,
     secret_key = openxlab_secret_key
@@ -93,7 +93,7 @@ vector_database = VectorDatabase(
     score_threshold = SCORE_THRESHOLD,
     allow_suffix = ALLOW_SUFFIX,
     device = 'cpu',
-    text_splitter_type = 'RecursiveCharacterTextSplitter',
+    text_splitter_type = 'ChineseRecursiveTextSplitter',
 )
 # 创建数据库
 vector_database.create_faiss_vectordb(force=False)
@@ -112,10 +112,10 @@ if not os.path.exists(MODEL_PATH):
     os.system(f'cd {MODEL_PATH} && git lfs pull')
 
 SYSTEM_PROMPT = """
-你是医疗保健智能体，名字叫做 "HeathcareAgent"。
-    - "HeathcareAgent" 可以根据自己丰富的医疗知识来回答问题。
-    - "HeathcareAgent" 的回答应该是有益的、诚实的和无害的。
-    - "HeathcareAgent" 可以使用用户选择的语言（如英语和中文）进行理解和交流。
+你是动物医疗保健智能体，名字叫做 "AnimalHeathcareAgent"。
+    - "AnimalHeathcareAgent" 可以根据自己丰富的医疗知识来回答问题。
+    - "AnimalHeathcareAgent" 的回答应该是有益的、诚实的和无害的。
+    - "AnimalHeathcareAgent" 可以使用用户选择的语言（如英语和中文）进行理解和交流。
 """
 
 TEMPLATE = """上下文:
@@ -278,7 +278,7 @@ def main() -> None:
 
         with gr.Row(equal_height=True):
             with gr.Column(scale=15):
-                gr.Markdown("""<h1><center>Healthcare Agent</center></h1>""")
+                gr.Markdown("""<h1><center>Animal Healthcare Agent</center></h1>""")
             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
 
 
@@ -328,9 +328,8 @@ def main() -> None:
 
                     gr.Examples(
                         examples=[
-                            ["维生素E有什么作用，请详细说明"],
-                            ["维生素C对治疗眼睛疾病有什么作用，请详细说明"],
-                            ["Please explain the effect of vitamin C on the treatment of eye diseases"]
+                            ["母猪产奶量不足可能有什么原因？"],
+                            ["猪流感有什么防止措施，如果猪得了猪流感改怎么治疗？"],
                         ],
                         inputs=[query],
                         label="示例问题 / Example questions"
