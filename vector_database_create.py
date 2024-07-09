@@ -18,7 +18,9 @@ vector_database = VectorDatabase(
     persist_directory = PERSIST_DIRECTORY,
     similarity_top_k = SIMILARITY_TOP_K,
     score_threshold = SCORE_THRESHOLD,
-    allow_suffix = ALLOW_SUFFIX
+    allow_suffix = ALLOW_SUFFIX,
+    device = 'cuda',
+    text_splitter_type = 'RecursiveCharacterTextSplitter',
 )
 
 # 创建数据库

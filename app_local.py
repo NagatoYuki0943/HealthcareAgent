@@ -28,6 +28,7 @@ vector_database = VectorDatabase(
     score_threshold = SCORE_THRESHOLD,
     allow_suffix = ALLOW_SUFFIX,
     device = 'cuda',
+    text_splitter_type = 'RecursiveCharacterTextSplitter',
 )
 # 创建数据库
 vector_database.create_faiss_vectordb(force=False)
