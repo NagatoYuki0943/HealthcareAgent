@@ -19,6 +19,7 @@ faiss-cpu
 pypdf
 unstructured # txt,md,doc,docx
 python-docx # doc,docx
+Markdown # markdown
 lmdeploy
 openxlab
 loguru
