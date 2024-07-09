@@ -106,7 +106,6 @@ vector_database.create_faiss_reranker_retriever()
 
 # 模型
 MODEL_PATH = "./models/internlm2_5-7b-chat"
-# 也许可以解决openxlab的重启错误
 if not os.path.exists(MODEL_PATH):
     os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2_5-7b-chat.git {MODEL_PATH}')
     os.system(f'cd {MODEL_PATH} && git lfs pull')
