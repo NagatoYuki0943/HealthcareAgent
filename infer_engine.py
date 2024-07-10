@@ -110,13 +110,13 @@ def convert_to_openai_history(
                 'type': 'text',
                 'text': prompt,
             }]
-
         else:
             prompt, images = prompt
             content = [{
                 'type': 'text',
                 'text': prompt,
             }]
+            # image: PIL.Image.Image
             images = images if isinstance(images, list) else [images]
             for image in images:
                 content.append({
