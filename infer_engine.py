@@ -18,8 +18,9 @@ import asyncio
 import random
 import re
 from loguru import logger
+
 from templates import get_prompt_template
-from utils import random_uuid_int
+from infer_utils import random_uuid_int, convert_to_openai_history
 
 
 @dataclass
@@ -64,105 +65,6 @@ class ApiConfig:
     api_key: str | None = None
     model: str = 'moonshot-v1-8k'
     system_prompt: str = "You are a helpful, respectful and honest assistant."
-
-
-def convert_to_openai_history(
-    history: Sequence,
-    query: str | tuple | None,
-) -> list:
-    """
-    将历史记录转换为openai格式
-
-    Args:
-        history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-        query (str | None): query
-
-    Returns:
-        list: a chat history in OpenAI format or a list of chat history.
-            [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant."
-                },
-                {
-                    "role": "user",
-                    "content": "What is the capital of France?"
-                },
-                {
-                    "role": "assistant",
-                    "content": "The capital of France is Paris."
-                },
-                {
-                    "role": "user",
-                    "content": "Thanks!"
-                },
-                {
-                    "role": "assistant",
-                    "content": "You are welcome."
-                }
-            ]
-    """
-    # 将历史记录转换为openai格式
-    messages = []
-    for prompt, response in history:
-        if isinstance(prompt, str):
-            content = [{
-                'type': 'text',
-                'text': prompt,
-            }]
-        else:
-            prompt, images = prompt
-            content = [{
-                'type': 'text',
-                'text': prompt,
-            }]
-            # image: PIL.Image.Image
-            images = images if isinstance(images, list) else [images]
-            for image in images:
-                content.append({
-                    'type': 'image_data',
-                    'image_data': {
-                        'data': image
-                    }
-                })
-        messages.append({
-            "role": "user",
-            "content": content
-        })
-
-        messages.append({
-            "role": "assistant",
-            # assistant 的回答必须是字符串,不能是数组
-            "content": response
-        })
-
-    # 添加当前的query
-    if query is not None:
-        if isinstance(query, str):
-            content = [{
-                'type': 'text',
-                'text': query,
-            }]
-        else:
-            query, images = query
-            content = [{
-                'type': 'text',
-                'text': query,
-            }]
-            images = images if isinstance(images, list) else [images]
-            for image in images:
-                content.append({
-                    'type': 'image_data',
-                    'image_data': {
-                        'data': image
-                    }
-                })
-        messages.append({
-                "role": "user",
-                "content": content
-        })
-
-    return messages
 
 
 class DeployEngine(ABC):

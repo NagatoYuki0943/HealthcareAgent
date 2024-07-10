@@ -16,7 +16,8 @@ from shutil import rmtree
 from modelscope import snapshot_download
 
 from vector_database import VectorDatabase
-from infer_engine import InferEngine, LmdeployConfig, convert_to_openai_history
+from infer_engine import InferEngine, LmdeployConfig
+from infer_utils import convert_to_openai_history
 from utils import remove_history_references, download_openxlab_dataset
 from ocr_chat import get_ernie_access_token, ocr_detection
 
