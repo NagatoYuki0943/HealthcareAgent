@@ -9,6 +9,11 @@ import random
 from loguru import logger
 
 
+# 可以传递一个提示语句 + 一张或者多张 PIL.Image.Image 的图片
+# 或者传递一个提示语句 + 一张或者多张图片的url地址或者本地地址,后面 tuple 中的第二个 str 或者 list[str] 指的就是图片地址
+VLQueryType = tuple[str, Image.Image] | tuple[str, list[Image.Image]] | tuple[str, str] | tuple[str, list[str]]
+
+
 def random_uuid(dtype: Literal['int', 'str', 'bytes', 'time'] = 'int') -> int | str | bytes:
     """生成随机uuid
     reference: https://github.com/vllm-project/vllm/blob/main/vllm/utils.py
@@ -67,14 +72,14 @@ def encode_image_base64(image: str | Image.Image) -> str:
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/vl/templates.py#L25-L69
 def convert_to_openai_history(
     history: Sequence,
-    query: str | tuple | None,
+    query: str | VLQueryType | None,
 ) -> list:
     """
     将历史记录转换为openai格式
 
     Args:
         history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-        query (str | None): query
+        query (str | VLQueryType | None): 查询语句
 
     Returns:
         list: a chat history in OpenAI format or a list of chat history.
