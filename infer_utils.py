@@ -170,15 +170,35 @@ def convert_to_openai_history(
             }]
             images = images if isinstance(images, list) else [images]
             for image in images:
-                content.append({
-                    'type': 'image_data',
-                    'image_data': {
-                        'data': image
+                # 'image_url': means url or local path to image.
+                # 'image_data': means PIL.Image.Image object.
+                if isinstance(image, str):
+                    image_base64_data = encode_image_base64(image)
+                    if image_base64_data == '':
+                        logger.error(f'failed to load file {image}')
+                        continue
+                    item = {
+                        'type': 'image_url',
+                        'image_url': {
+                            'url':
+                            f'data:image/jpeg;base64,{image_base64_data}'
+                        }
                     }
-                })
+                elif isinstance(image, Image.Image):
+                    item = {
+                        'type': 'image_data',
+                        'image_data': {
+                            'data': image
+                        }
+                    }
+                else:
+                    raise ValueError(
+                        'image should be a str(url/path) or PIL.Image.Image')
+
+                content.append(item)
         messages.append({
-                "role": "user",
-                "content": content
+            "role": "user",
+            "content": content
         })
 
     return messages
