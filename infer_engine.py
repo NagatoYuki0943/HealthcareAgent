@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Generator, AsyncGenerator, Literal, Sequence, Any
+from PIL import Image
 import torch
 from torch import Tensor
 import transformers
@@ -752,7 +753,7 @@ class LmdeployLocalEngine(LmdeployEngine):
 
     def chat(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -795,7 +796,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         response: Response
         # response = self.pipe(
         response = self.pipe.chat(
-            prompt = messages,
+            messages,
             session = None,
             gen_config = gen_config,
             do_preprocess = True,
@@ -811,7 +812,7 @@ class LmdeployLocalEngine(LmdeployEngine):
 
     def chat_stream(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -912,7 +913,7 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat_completions_v1(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1018,7 +1019,7 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat_interactive_v1(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1077,7 +1078,7 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1101,7 +1102,7 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat_stream(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1146,7 +1147,7 @@ class ApiEngine(DeployEngine):
 
     def chat(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1230,7 +1231,7 @@ class ApiEngine(DeployEngine):
 
     def chat_stream(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1348,7 +1349,7 @@ class InferEngine(DeployEngine):
 
     def chat(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1360,7 +1361,7 @@ class InferEngine(DeployEngine):
         """一次返回完整回答
 
         Args:
-            query (str): 问题
+            query (str | tuple[str, Image.Image] | tuple[str, list[Image.Image]]): 问题,或者问题加图片
             history (Sequence, optional): 对话历史. Defaults to [].
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
@@ -1386,7 +1387,7 @@ class InferEngine(DeployEngine):
 
     def chat_stream(
         self,
-        query: str,
+        query: str | tuple[str, Image.Image] | tuple[str, list[Image.Image]],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1398,7 +1399,7 @@ class InferEngine(DeployEngine):
         """流式返回回答
 
         Args:
-            query (str): 问题
+            query (str | tuple[str, Image.Image] | tuple[str, list[Image.Image]]): 问题,或者问题加图片
             history (Sequence, optional): 对话历史. Defaults to [].
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
