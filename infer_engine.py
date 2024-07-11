@@ -18,8 +18,9 @@ import asyncio
 import random
 import re
 from loguru import logger
+
 from templates import get_prompt_template
-from utils import random_uuid_int
+from infer_utils import random_uuid_int, convert_to_openai_history
 
 
 @dataclass
@@ -64,67 +65,6 @@ class ApiConfig:
     api_key: str | None = None
     model: str = 'moonshot-v1-8k'
     system_prompt: str = "You are a helpful, respectful and honest assistant."
-
-
-def convert_to_openai_history(
-    history: Sequence,
-    query: str | None,
-) -> list:
-    """
-    将历史记录转换为openai格式
-
-    Args:
-        history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-        query (str | None): query
-
-    Returns:
-        list: a chat history in OpenAI format or a list of chat history.
-            [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant."
-                },
-                {
-                    "role": "user",
-                    "content": "What is the capital of France?"
-                },
-                {
-                    "role": "assistant",
-                    "content": "The capital of France is Paris."
-                },
-                {
-                    "role": "user",
-                    "content": "Thanks!"
-                },
-                {
-                    "role": "assistant",
-                    "content": "You are welcome."
-                }
-            ]
-    """
-    # 将历史记录转换为openai格式
-    prompt = []
-    for user, assistant in history:
-        prompt.append(
-            {
-                "role": "user",
-                "content": user
-            }
-        )
-        prompt.append(
-            {
-                "role": "assistant",
-                "content": assistant
-            })
-    if query is not None:
-        # 需要添加当前的query
-        prompt.append(
-            {
-                "role": "user",
-                "content": query
-            }
-        )
-    return prompt
 
 
 class DeployEngine(ABC):
@@ -827,9 +767,8 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(history, query)
-        if self.use_vl_engine:
-            prompt = self.pipe._convert_prompts(prompt)
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
@@ -856,7 +795,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         response: Response
         # response = self.pipe(
         response = self.pipe.chat(
-            prompt = prompt,
+            prompt = messages,
             session = None,
             gen_config = gen_config,
             do_preprocess = True,
@@ -888,9 +827,8 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(history, query)
-        if self.use_vl_engine:
-            prompt = self.pipe._convert_prompts(prompt)
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
@@ -919,7 +857,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         # for response in self.pipe.stream_infer(
         for response in self.__stream_infer_single(
         # async for response in self.chat_stream_local(
-            prompt = prompt,
+            prompt = messages,
             session_id = session_id,
             gen_config = gen_config,
             do_preprocess = True,
@@ -996,14 +934,15 @@ class LmdeployServeEngine(LmdeployEngine):
         }))
 
         # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(history, query)
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
 
         logger.info(f"query: {query}")
         response_text: str = ""
         response: dict
         for response in self.api_client.chat_completions_v1(
             model = self.config.model_name,
-            messages = prompt,
+            messages = messages,
             temperature = temperature,
             top_p = top_p,
             top_k = top_k, # add
@@ -1101,13 +1040,14 @@ class LmdeployServeEngine(LmdeployEngine):
         }))
 
         # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(history, query)
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
 
         logger.info(f"query: {query}")
         response_text: str = ""
         response: dict
         for response in self.api_client.chat_interactive_v1(
-            prompt = prompt,
+            prompt = messages,
             image_url = None,
             session_id = session_id,
             interactive_mode = False,
@@ -1222,13 +1162,13 @@ class ApiEngine(DeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt: list[dict[str, str]] = [
+        messages: list[dict[str, str]] = [
             {
                 "role": "system",
                 "content": self.config.system_prompt
             },
         ] + convert_to_openai_history(history, query)
-        logger.info(f"prompt: {prompt}")
+        logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
@@ -1243,7 +1183,7 @@ class ApiEngine(DeployEngine):
 
         try:
             completion: ChatCompletion = self.client.chat.completions.create(
-                messages = prompt,
+                messages = messages,
                 model = model,
                 max_tokens = max_new_tokens,
                 n = 1,                      # 为每条输入消息生成多少个结果，默认为 1
@@ -1306,13 +1246,13 @@ class ApiEngine(DeployEngine):
         logger.info(f"{session_id = }")
 
         # 将历史记录转换为openai格式
-        prompt = [
+        messages = [
             {
                 "role": "system",
                 "content": self.config.system_prompt
             },
         ] + convert_to_openai_history(history, query)
-        logger.info(f"prompt: {prompt}")
+        logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
@@ -1327,7 +1267,7 @@ class ApiEngine(DeployEngine):
 
         try:
             completion: ChatCompletion = self.client.chat.completions.create(
-                messages = prompt,
+                messages = messages,
                 model = model,
                 max_tokens = max_new_tokens,
                 n = 1,                      # 为每条输入消息生成多少个结果，默认为 1
