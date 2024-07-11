@@ -365,6 +365,8 @@ class TransfomersEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -372,7 +374,6 @@ class TransfomersEngine(DeployEngine):
             "top_k": top_k,
         }))
 
-        logger.info(f"query: {query}")
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
         # response, history = self.model.chat( # only for internlm2
         response, history = self.__chat(
@@ -405,6 +406,8 @@ class TransfomersEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -412,7 +415,6 @@ class TransfomersEngine(DeployEngine):
             "top_k": top_k,
         }))
 
-        logger.info(f"query: {query}")
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
         # stream_chat 返回的句子长度是逐渐边长的,length的作用是记录之前的输出长度,用来截断之前的输出
         # for response, history in self.model.stream_chat( # only for internlm2
@@ -767,6 +769,8 @@ class LmdeployLocalEngine(LmdeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         # 将历史记录转换为openai格式
         messages = convert_to_openai_history(history, query)
         logger.info(f"messages: {messages}")
@@ -790,7 +794,6 @@ class LmdeployLocalEngine(LmdeployEngine):
         )
         logger.info(f"gen_config: {gen_config}")
 
-        logger.info(f"query: {query}")
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
         response: Response
@@ -827,6 +830,8 @@ class LmdeployLocalEngine(LmdeployEngine):
         session_id = random_uuid_int() if session_id is None else session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         # 将历史记录转换为openai格式
         messages = convert_to_openai_history(history, query)
         logger.info(f"messages: {messages}")
@@ -850,7 +855,6 @@ class LmdeployLocalEngine(LmdeployEngine):
         )
         logger.info(f"gen_config: {gen_config}")
 
-        logger.info(f"query: {query}")
         response_text: str = ""
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
@@ -927,6 +931,12 @@ class LmdeployServeEngine(LmdeployEngine):
         session_id = random_uuid_int() if session_id is None else session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
+        # 将历史记录转换为openai格式
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -934,11 +944,6 @@ class LmdeployServeEngine(LmdeployEngine):
             "top_k": top_k,
         }))
 
-        # 将历史记录转换为openai格式
-        messages = convert_to_openai_history(history, query)
-        logger.info(f"messages: {messages}")
-
-        logger.info(f"query: {query}")
         response_text: str = ""
         response: dict
         for response in self.api_client.chat_completions_v1(
@@ -1033,6 +1038,12 @@ class LmdeployServeEngine(LmdeployEngine):
         session_id = random_uuid_int() if session_id is None else session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
+        # 将历史记录转换为openai格式
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -1040,11 +1051,6 @@ class LmdeployServeEngine(LmdeployEngine):
             "top_k": top_k,
         }))
 
-        # 将历史记录转换为openai格式
-        messages = convert_to_openai_history(history, query)
-        logger.info(f"messages: {messages}")
-
-        logger.info(f"query: {query}")
         response_text: str = ""
         response: dict
         for response in self.api_client.chat_interactive_v1(
@@ -1162,6 +1168,8 @@ class ApiEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         # 将历史记录转换为openai格式
         messages: list[dict[str, str]] = [
             {
@@ -1180,7 +1188,6 @@ class ApiEngine(DeployEngine):
 
         model = self.config.model if model is None else model
         logger.info(f"use model: {model}")
-        logger.info(f"query: {query}")
 
         try:
             completion: ChatCompletion = self.client.chat.completions.create(
@@ -1246,6 +1253,8 @@ class ApiEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         # 将历史记录转换为openai格式
         messages = [
             {
@@ -1264,7 +1273,6 @@ class ApiEngine(DeployEngine):
 
         model = self.config.model if model is None else model
         logger.info(f"use model: {model}")
-        logger.info(f"query: {query}")
 
         try:
             completion: ChatCompletion = self.client.chat.completions.create(
