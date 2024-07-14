@@ -155,11 +155,12 @@ def convert_to_openai_history(
             "content": content
         })
 
-        messages.append({
-            "role": "assistant",
-            # assistant 的回答必须是字符串,不能是数组
-            "content": response
-        })
+        if response is not None:
+            messages.append({
+                "role": "assistant",
+                # assistant 的回答必须是字符串,不能是数组
+                "content": response
+            })
 
     # 添加当前的query
     if query is not None:
