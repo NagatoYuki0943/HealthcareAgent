@@ -9,6 +9,11 @@ import random
 from loguru import logger
 
 
+# 可以传递一个提示语句 + 一张或者多张 PIL.Image.Image 的图片
+# 或者传递一个提示语句 + 一张或者多张图片的url地址或者本地地址,后面 tuple 中的第二个 str 或者 list[str] 指的就是图片地址
+VLQueryType = tuple[str, Image.Image] | tuple[str, list[Image.Image]] | tuple[str, str] | tuple[str, list[str]]
+
+
 def random_uuid(dtype: Literal['int', 'str', 'bytes', 'time'] = 'int') -> int | str | bytes:
     """生成随机uuid
     reference: https://github.com/vllm-project/vllm/blob/main/vllm/utils.py
@@ -66,15 +71,16 @@ def encode_image_base64(image: str | Image.Image) -> str:
 
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/vl/templates.py#L25-L69
 def convert_to_openai_history(
-    history: Sequence,
-    query: str | tuple | None,
+    history: Sequence[Sequence],
+    query: str | VLQueryType | None = None,
 ) -> list:
     """
     将历史记录转换为openai格式
 
     Args:
-        history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-        query (str | None): query
+        history (Sequence[Sequence]):聊天历史记录
+            example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query (str | VLQueryType | None): 查询语句, Defaults to None.
 
     Returns:
         list: a chat history in OpenAI format or a list of chat history.
@@ -116,7 +122,7 @@ def convert_to_openai_history(
                 'text': prompt,
             }]
             # image: PIL.Image.Image
-            images = images if isinstance(images, list) else [images]
+            images = images if isinstance(images, (list, tuple)) else [images]
             for image in images:
                 # 'image_url': means url or local path to image.
                 # 'image_data': means PIL.Image.Image object.
@@ -149,11 +155,12 @@ def convert_to_openai_history(
             "content": content
         })
 
-        messages.append({
-            "role": "assistant",
-            # assistant 的回答必须是字符串,不能是数组
-            "content": response
-        })
+        if response is not None:
+            messages.append({
+                "role": "assistant",
+                # assistant 的回答必须是字符串,不能是数组
+                "content": response
+            })
 
     # 添加当前的query
     if query is not None:
@@ -168,17 +175,37 @@ def convert_to_openai_history(
                 'type': 'text',
                 'text': query,
             }]
-            images = images if isinstance(images, list) else [images]
+            images = images if isinstance(images, (list, tuple)) else [images]
             for image in images:
-                content.append({
-                    'type': 'image_data',
-                    'image_data': {
-                        'data': image
+                # 'image_url': means url or local path to image.
+                # 'image_data': means PIL.Image.Image object.
+                if isinstance(image, str):
+                    image_base64_data = encode_image_base64(image)
+                    if image_base64_data == '':
+                        logger.error(f'failed to load file {image}')
+                        continue
+                    item = {
+                        'type': 'image_url',
+                        'image_url': {
+                            'url':
+                            f'data:image/jpeg;base64,{image_base64_data}'
+                        }
                     }
-                })
+                elif isinstance(image, Image.Image):
+                    item = {
+                        'type': 'image_data',
+                        'image_data': {
+                            'data': image
+                        }
+                    }
+                else:
+                    raise ValueError(
+                        'image should be a str(url/path) or PIL.Image.Image')
+
+                content.append(item)
         messages.append({
-                "role": "user",
-                "content": content
+            "role": "user",
+            "content": content
         })
 
     return messages
