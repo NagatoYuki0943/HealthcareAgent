@@ -71,14 +71,15 @@ def encode_image_base64(image: str | Image.Image) -> str:
 
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/vl/templates.py#L25-L69
 def convert_to_openai_history(
-    history: Sequence,
+    history: Sequence[Sequence[str | VLQueryType, str]],
     query: str | VLQueryType | None,
 ) -> list:
     """
     将历史记录转换为openai格式
 
     Args:
-        history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        history (Sequence[Sequence[str | VLQueryType, str]]):聊天历史记录
+            example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         query (str | VLQueryType | None): 查询语句
 
     Returns:
@@ -121,7 +122,7 @@ def convert_to_openai_history(
                 'text': prompt,
             }]
             # image: PIL.Image.Image
-            images = images if isinstance(images, list) else [images]
+            images = images if isinstance(images, list) or isinstance(images, tuple) else [images]
             for image in images:
                 # 'image_url': means url or local path to image.
                 # 'image_data': means PIL.Image.Image object.
@@ -173,7 +174,7 @@ def convert_to_openai_history(
                 'type': 'text',
                 'text': query,
             }]
-            images = images if isinstance(images, list) else [images]
+            images = images if isinstance(images, list) or isinstance(images, tuple) else [images]
             for image in images:
                 # 'image_url': means url or local path to image.
                 # 'image_data': means PIL.Image.Image object.
