@@ -72,7 +72,7 @@ def encode_image_base64(image: str | Image.Image) -> str:
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/vl/templates.py#L25-L69
 def convert_to_openai_history(
     history: Sequence[Sequence],
-    query: str | VLQueryType | None,
+    query: str | VLQueryType | None = None,
 ) -> list:
     """
     将历史记录转换为openai格式
@@ -80,7 +80,7 @@ def convert_to_openai_history(
     Args:
         history (Sequence[Sequence]):聊天历史记录
             example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-        query (str | VLQueryType | None): 查询语句
+        query (str | VLQueryType | None): 查询语句, Defaults to None.
 
     Returns:
         list: a chat history in OpenAI format or a list of chat history.
