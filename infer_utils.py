@@ -468,7 +468,7 @@ def test_convert_to_openai_history_new():
     ]
 
 
-def convert_to_lmdeploy_history(original_history: list) -> list:
+def convert_to_multimodal_history(original_history: list) -> list:
     transformed_history = []
     temp_image_list = []
     for query, answer in original_history:
@@ -490,7 +490,7 @@ def convert_to_lmdeploy_history(original_history: list) -> list:
     return transformed_history
 
 
-def test_convert_to_lmdeploy_history():
+def test_convert_to_multimodal_history():
     # 原始列表
     original = [
         ['你是谁', '我是你的小助手。'],
@@ -507,7 +507,7 @@ def test_convert_to_lmdeploy_history():
     ]
 
     # 转换列表
-    transformed = convert_to_lmdeploy_history(original)
+    transformed = convert_to_multimodal_history(original)
     print(transformed)
     [
         ['你是谁', '我是你的小助手。'],
@@ -517,7 +517,7 @@ def test_convert_to_lmdeploy_history():
         [('', ['./images/0005.jpg', './images/0006.jpg']), '这两张图片显示了雪山上的景色。']
     ]
 
-    transformed = convert_to_lmdeploy_history(original[:-1])
+    transformed = convert_to_multimodal_history(original[:-1])
     print(transformed)
     [
         ['你是谁', '我是你的小助手。'],
@@ -533,4 +533,4 @@ if __name__ == '__main__':
     print("*" * 100)
     test_convert_to_openai_history_new()
     print("*" * 100)
-    test_convert_to_lmdeploy_history()
+    test_convert_to_multimodal_history()
