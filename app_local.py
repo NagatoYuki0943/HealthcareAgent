@@ -112,6 +112,7 @@ def chat(
     # 是否是有效的问题
     query = query.strip()
     if query == None or len(query) < 1:
+        logger.warning(f"query is None, return history")
         yield history
         return
     logger.info(f"query: {query}")
@@ -170,6 +171,7 @@ def regenerate(
             session_id = session_id,
         )
     else:
+        logger.warning(f"no history, can't regenerate")
         yield history
 
 

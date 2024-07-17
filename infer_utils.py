@@ -220,8 +220,7 @@ def convert_to_openai_history(
     return messages
 
 
-def test_convert_to_openai_history(
-) -> list:
+def test_convert_to_openai_history():
     history1 = [
         ['text1', '[91 24 10 19 73]'],
         ['text2', '[85 98 95  3 25]'],
@@ -250,6 +249,7 @@ def test_convert_to_openai_history(
     query = ('how dare you!', Image.open('../images/openxlab.png'))
 
     messages2 = convert_to_openai_history(history2, query)
+    print(messages2)
     [
         {'role': 'user', 'content': '你是谁'},
         {'role': 'assistant', 'content': '[47  5 79  7 79]'},
@@ -415,8 +415,7 @@ def convert_to_openai_history_new(
     return messages
 
 
-def test_convert_to_openai_history_new(
-) -> list:
+def test_convert_to_openai_history_new():
     history1 = [
         ['text1', '[91 24 10 19 73]'],
         ['text2', '[85 98 95  3 25]'],
