@@ -118,10 +118,11 @@ def convert_to_openai_history(
     messages = []
     for prompt, response in history:
         if isinstance(prompt, str):
-            content = [{
-                'type': 'text',
-                'text': prompt,
-            }]
+            content = prompt # 兼容不支持列表格式的模型
+            # content = [{
+            #     'type': 'text',
+            #     'text': prompt,
+            # }]
         else:
             prompt, images = prompt
             content = [{
@@ -172,10 +173,11 @@ def convert_to_openai_history(
     # 添加当前的query
     if query is not None:
         if isinstance(query, str):
-            content = [{
-                'type': 'text',
-                'text': query,
-            }]
+            content = query # 兼容不支持列表格式的模型
+            # content = [{
+            #     'type': 'text',
+            #     'text': query,
+            # }]
         else:
             query, images = query
             content = [{
@@ -230,13 +232,13 @@ def history_test(
     print(messages1)
     print("\n")
     [
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'text1'}]},
+        {'role': 'user', 'content': 'text1'},
         {'role': 'assistant', 'content': '[91 24 10 19 73]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'text2'}]},
+        {'role': 'user', 'content': 'text2'},
         {'role': 'assistant', 'content': '[85 98 95  3 25]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'text3'}]},
+        {'role': 'user', 'content': 'text3'},
         {'role': 'assistant', 'content': '[58 60 35 97 39]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'text4'}]}
+        {'role': 'user', 'content': 'text4'}
     ]
 
 
@@ -248,27 +250,23 @@ def history_test(
     query = ('how dare you!', Image.open('../images/openxlab.png'))
 
     messages2 = convert_to_openai_history(history2, query)
-    print(messages2)
     [
-        {'role': 'user', 'content': [{'type': 'text', 'text': '你是谁'}]},
+        {'role': 'user', 'content': '你是谁'},
         {'role': 'assistant', 'content': '[47  5 79  7 79]'},
         {'role': 'user', 'content': [
-                {'type': 'text', 'text': 'what is this?'},
-                {'type': 'image_data', 'image_data': {'data':' <PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1792x871 at 0x290FCF14C90>'}}
-            ]
+            {'type': 'text', 'text': 'what is this?'},
+            {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1792x871 at 0x20EF90509D0>'}}]
         },
         {'role': 'assistant', 'content': '[58 71 49 87 10]'},
         {'role': 'user', 'content': [
-                {'type': 'text', 'text': '这2张图片展示的什么内容?'},
-                {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x290FCF7D650>'}},
-                {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x290FCF7E710>'}}
-            ]
+            {'type': 'text', 'text': '这2张图片展示的什么内容?'},
+            {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x20EF90C62D0>'}},
+            {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x20EF90C64D0>'}}]
         },
         {'role': 'assistant', 'content': '[29 86 41 26 84]'},
         {'role': 'user', 'content': [
-                {'type': 'text', 'text': 'how dare you!'},
-                {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x290FCF7EBD0>'}}
-            ]
+            {'type': 'text', 'text': 'how dare you!'},
+            {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x20EF90C6990>'}}]
         }
     ]
 
@@ -309,10 +307,11 @@ def convert_to_openai_history_new(
     messages = []
     for prompt, response in history:
         if isinstance(prompt, str):
-            content = [{
-                'type': 'text',
-                'text': prompt,
-            }]
+            content = prompt # 兼容不支持列表格式的模型
+            # content = [{
+            #     'type': 'text',
+            #     'text': prompt,
+            # }]
         else:
             content = [{
                 'type': 'text',
@@ -361,10 +360,11 @@ def convert_to_openai_history_new(
     # 添加当前的query
     if query is not None:
         if isinstance(query, str):
-            content = [{
-                'type': 'text',
-                'text': query,
-            }]
+            content = query # 兼容不支持列表格式的模型
+            # content = [{
+            #     'type': 'text',
+            #     'text': query,
+            # }]
         else:
             query_text, images = query['text'], query['files']
             content = [{
@@ -418,13 +418,13 @@ def new_history_test(
     print(messages1)
     print("\n")
     [
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'text1'}]},
+        {'role': 'user', 'content': 'text1'},
         {'role': 'assistant', 'content': '[91 24 10 19 73]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'text2'}]},
+        {'role': 'user', 'content': 'text2'},
         {'role': 'assistant', 'content': '[85 98 95  3 25]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'text3'}]},
+        {'role': 'user', 'content': 'text3'},
         {'role': 'assistant', 'content': '[58 60 35 97 39]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'text4'}]}
+        {'role': 'user', 'content': 'text4'}
     ]
 
 
@@ -447,16 +447,16 @@ def new_history_test(
     messages2 = convert_to_openai_history_new(history2, query)
     print(messages2)
     [
-        {'role': 'user', 'content': [{'type': 'text', 'text': '你是谁'}]},
+        {'role': 'user', 'content': '你是谁'},
         {'role': 'assistant', 'content': '[47  5 79  7 79]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1792x871 at 0x23B1E20EB90>'}}]},
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'what is this?'}]},
+        {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1792x871 at 0x1B5C064FF90>'}}]},
+        {'role': 'user', 'content': 'what is this?'},
         {'role': 'assistant', 'content': '[58 71 49 87 10]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x23B1E288510>'}}]},
-        {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x23B1E288750>'}}]},
-        {'role': 'user', 'content': [{'type': 'text', 'text': '这2张图片展示的什么内容?'}]},
+        {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x1B5C06C59D0>'}}]},
+        {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x1B5C06C5C10>'}}]},
+        {'role': 'user', 'content': '这2张图片展示的什么内容?'},
         {'role': 'assistant', 'content': '[29 86 41 26 84]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'how dare you!'}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x23B1E288C10>'}}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x23B1E288E90>'}}]}
+        {'role': 'user', 'content': [{'type': 'text', 'text': 'how dare you!'}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x1B5C06C60D0>'}}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x1B5C06C6350>'}}]}
     ]
 
 
