@@ -98,7 +98,7 @@ def convert_to_openai_history(
     Returns:
         list: a chat history in OpenAI format or a list of chat history.
             [
-                {'role': 'user', 'content': [{'type': 'text', 'text': 'What is the capital of France?'}]},
+                {'role': 'user', 'content': 'What is the capital of France?'},
                 {'role': 'assistant', 'content': 'The capital of France is Paris.'},
                 {'role': 'user', 'content': [
                         {'type': 'text', 'text': 'What is in the image?'},
@@ -220,7 +220,7 @@ def convert_to_openai_history(
     return messages
 
 
-def history_test(
+def test_convert_to_openai_history(
 ) -> list:
     history1 = [
         ['text1', '[91 24 10 19 73]'],
@@ -295,12 +295,21 @@ def convert_to_openai_history_new(
     Returns:
         list: a chat history in OpenAI format or a list of chat history.
             [
-                {'role': 'user', 'content': [{'type': 'text', 'text': 'What is the capital of France?'}]},
+                {'role': 'user', 'content': 'What is the capital of France?'},
                 {'role': 'assistant', 'content': 'The capital of France is Paris.'},
-                {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': Image1}}]},
-                {'role': 'user', 'content': [{'type': 'text', 'text': 'What is in the image?'}]},
+                {'role': 'user', 'content': [
+                        {'type': 'text', 'text': ''},
+                        {'type': 'image_data', 'image_data': {'data': Image1}}
+                    ]
+                },
+                {'role': 'user', 'content': 'What is in the image?'},
                 {'role': 'assistant', 'content': 'There is a dog in the image.'},
-                {'role': 'user', 'content': [{'type': 'text', 'text': 'How dare you!'}, {'type': 'image_data', 'image_data': {'data': Image2}}, {'type': 'image_data', 'image_data': {'data': Image3}}]}
+                {'role': 'user', 'content': [
+                        {'type': 'text', 'text': 'How dare you!'},
+                        {'type': 'image_data', 'image_data': {'data': Image2}},
+                        {'type': 'image_data', 'image_data': {'data': Image3}}
+                    ]
+                }
             ]
     """
     # 将历史记录转换为openai格式
@@ -406,7 +415,7 @@ def convert_to_openai_history_new(
     return messages
 
 
-def new_history_test(
+def test_convert_to_openai_history_new(
 ) -> list:
     history1 = [
         ['text1', '[91 24 10 19 73]'],
@@ -460,7 +469,67 @@ def new_history_test(
     ]
 
 
+def convert_to_lmdeploy_history(original_history: list) -> list:
+    transformed_history = []
+    temp_image_list = []
+    for query, answer in original_history:
+        if isinstance(query, str):
+            if len(temp_image_list) == 0:
+                transformed_history.append([query, answer])
+            else:
+                query_with_image = (query, temp_image_list)
+                transformed_history.append([query_with_image, answer])
+                temp_image_list = []
+        elif isinstance(query, tuple):
+            temp_image_list.append(query[0])
+        else:
+            raise ValueError(f"{query} 格式错误")
+
+    return transformed_history
+
+
+def test_convert_to_lmdeploy_history():
+    # 原始列表
+    original = [
+        ['你是谁', '我是你的小助手。'],
+        [('./images/0001.jpg',), None],
+        ['', '这张图片中有一只猫。'],
+        [('./images/0002.jpg',), None],
+        ['这张图片展示的什么内容?', '这张图片中也有一只猫。'],
+        [('./images/0003.jpg',), None],
+        [('./images/0004.jpg',), None],
+        ['这2张图片展示的什么内容?', '第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。'],
+        [('./images/0005.jpg',), None],
+        [('./images/0006.jpg',), None],
+        ['', '这两张图片显示了雪山上的景色。']
+    ]
+
+    # 转换列表
+    transformed = convert_to_lmdeploy_history(original)
+    print(transformed)
+    [
+        ['你是谁', '我是你的小助手。'],
+        [('', ['./images/0001.jpg']), '这张图片中有一只猫。'],
+        [('这张图片展示的什么内容?', ['./images/0002.jpg']), '这张图片中也有一只猫。'],
+        [('这2张图片展示的什么内容?', ['./images/0003.jpg', './images/0004.jpg']), '第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。'],
+        [('', ['./images/0005.jpg', './images/0006.jpg']), '这两张图片显示了雪山上的景色。']
+    ]
+
+    # to
+    correct = [
+        ['你是谁', '我是你的小助手。'],
+        [('', ['./images/0001.jpg']), '这张图片中有一只猫。'],
+        [('这张图片展示的什么内容?', ['./images/0002.jpg']), '这张图片中也有一只猫。'],
+        [('这2张图片展示的什么内容?', ['./images/0003.jpg', './images/0004.jpg']), '第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。'],
+        [('', ['./images/0005.jpg', './images/0006.jpg']), '这两张图片显示了雪山上的景色。']
+    ]
+
+    print(transformed == correct)
+
+
 if __name__ == '__main__':
-    history_test()
-    print("\n\n")
-    # new_history_test()
+    test_convert_to_openai_history()
+    print("*" * 100)
+    test_convert_to_openai_history_new()
+    print("*" * 100)
+    test_convert_to_lmdeploy_history()
