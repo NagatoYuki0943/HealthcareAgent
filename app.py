@@ -265,11 +265,14 @@ def ocr_chat(img, query, history: list, current_img: str):
     try:
         res = requests.request("POST", url, headers=headers, data=payload).json()
         response = res['result']
+        logger.info(f"{query = }")
+        logger.info(f"{response = }")
         history.append([query, response])
         logger.info(f"{history = }")
 
         return "", history, current_img
     except Exception as e:
+        logger.error(f"{e = }")
         return e, history, current_img
 
 
