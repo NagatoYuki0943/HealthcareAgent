@@ -468,7 +468,7 @@ def test_convert_to_openai_history_new():
     ]
 
 
-def convert_to_multimodal_history(original_history: list) -> list:
+def convert_to_multimodal_history(original_history: list, use_pil: bool = False) -> list:
     transformed_history = []
     temp_image_list = []
     for query, answer in original_history:
@@ -480,7 +480,10 @@ def convert_to_multimodal_history(original_history: list) -> list:
                 transformed_history.append([query_with_image, answer])
                 temp_image_list = []
         elif isinstance(query, tuple):
-            temp_image_list.append(query[0])
+            if use_pil:
+                temp_image_list.append(Image.open(query[0]))
+            else:
+                temp_image_list.append(query[0])
         else:
             raise ValueError(f"{query} 格式错误")
 
