@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import Generator, AsyncGenerator, Literal, Sequence, Any
+from PIL import Image
 import torch
 from torch import Tensor
 import transformers
@@ -18,8 +19,9 @@ import asyncio
 import random
 import re
 from loguru import logger
+
 from templates import get_prompt_template
-from utils import random_uuid_int
+from infer_utils import random_uuid_int, convert_to_openai_history, VLQueryType
 
 
 @dataclass
@@ -64,67 +66,6 @@ class ApiConfig:
     api_key: str | None = None
     model: str = 'moonshot-v1-8k'
     system_prompt: str = "You are a helpful, respectful and honest assistant."
-
-
-def convert_to_openai_history(
-    history: Sequence,
-    query: str | None,
-) -> list:
-    """
-    将历史记录转换为openai格式
-
-    Args:
-        history (list): [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
-        query (str | None): query
-
-    Returns:
-        list: a chat history in OpenAI format or a list of chat history.
-            [
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant."
-                },
-                {
-                    "role": "user",
-                    "content": "What is the capital of France?"
-                },
-                {
-                    "role": "assistant",
-                    "content": "The capital of France is Paris."
-                },
-                {
-                    "role": "user",
-                    "content": "Thanks!"
-                },
-                {
-                    "role": "assistant",
-                    "content": "You are welcome."
-                }
-            ]
-    """
-    # 将历史记录转换为openai格式
-    prompt = []
-    for user, assistant in history:
-        prompt.append(
-            {
-                "role": "user",
-                "content": user
-            }
-        )
-        prompt.append(
-            {
-                "role": "assistant",
-                "content": assistant
-            })
-    if query is not None:
-        # 需要添加当前的query
-        prompt.append(
-            {
-                "role": "user",
-                "content": query
-            }
-        )
-    return prompt
 
 
 class DeployEngine(ABC):
@@ -424,6 +365,8 @@ class TransfomersEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -431,7 +374,6 @@ class TransfomersEngine(DeployEngine):
             "top_k": top_k,
         }))
 
-        logger.info(f"query: {query}")
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
         # response, history = self.model.chat( # only for internlm2
         response, history = self.__chat(
@@ -464,6 +406,8 @@ class TransfomersEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -471,7 +415,6 @@ class TransfomersEngine(DeployEngine):
             "top_k": top_k,
         }))
 
-        logger.info(f"query: {query}")
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
         # stream_chat 返回的句子长度是逐渐边长的,length的作用是记录之前的输出长度,用来截断之前的输出
         # for response, history in self.model.stream_chat( # only for internlm2
@@ -812,8 +755,8 @@ class LmdeployLocalEngine(LmdeployEngine):
 
     def chat(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -826,10 +769,11 @@ class LmdeployLocalEngine(LmdeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(history, query)
-        if self.use_vl_engine:
-            prompt = self.pipe._convert_prompts(prompt)
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
@@ -850,13 +794,12 @@ class LmdeployLocalEngine(LmdeployEngine):
         )
         logger.info(f"gen_config: {gen_config}")
 
-        logger.info(f"query: {query}")
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
         response: Response
         # response = self.pipe(
         response = self.pipe.chat(
-            prompt = prompt,
+            messages,
             session = None,
             gen_config = gen_config,
             do_preprocess = True,
@@ -872,8 +815,8 @@ class LmdeployLocalEngine(LmdeployEngine):
 
     def chat_stream(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -887,10 +830,11 @@ class LmdeployLocalEngine(LmdeployEngine):
         session_id = random_uuid_int() if session_id is None else session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(history, query)
-        if self.use_vl_engine:
-            prompt = self.pipe._convert_prompts(prompt)
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
@@ -911,7 +855,6 @@ class LmdeployLocalEngine(LmdeployEngine):
         )
         logger.info(f"gen_config: {gen_config}")
 
-        logger.info(f"query: {query}")
         response_text: str = ""
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
@@ -919,7 +862,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         # for response in self.pipe.stream_infer(
         for response in self.__stream_infer_single(
         # async for response in self.chat_stream_local(
-            prompt = prompt,
+            prompt = messages,
             session_id = session_id,
             gen_config = gen_config,
             do_preprocess = True,
@@ -974,8 +917,8 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat_completions_v1(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -988,6 +931,12 @@ class LmdeployServeEngine(LmdeployEngine):
         session_id = random_uuid_int() if session_id is None else session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
+        # 将历史记录转换为openai格式
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -995,15 +944,11 @@ class LmdeployServeEngine(LmdeployEngine):
             "top_k": top_k,
         }))
 
-        # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(history, query)
-
-        logger.info(f"query: {query}")
         response_text: str = ""
         response: dict
         for response in self.api_client.chat_completions_v1(
             model = self.config.model_name,
-            messages = prompt,
+            messages = messages,
             temperature = temperature,
             top_p = top_p,
             top_k = top_k, # add
@@ -1079,8 +1024,8 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat_interactive_v1(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -1093,6 +1038,12 @@ class LmdeployServeEngine(LmdeployEngine):
         session_id = random_uuid_int() if session_id is None else session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
+        # 将历史记录转换为openai格式
+        messages = convert_to_openai_history(history, query)
+        logger.info(f"messages: {messages}")
+
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
             "temperature": temperature,
@@ -1100,14 +1051,10 @@ class LmdeployServeEngine(LmdeployEngine):
             "top_k": top_k,
         }))
 
-        # 将历史记录转换为openai格式
-        prompt = convert_to_openai_history(history, query)
-
-        logger.info(f"query: {query}")
         response_text: str = ""
         response: dict
         for response in self.api_client.chat_interactive_v1(
-            prompt = prompt,
+            prompt = messages,
             image_url = None,
             session_id = session_id,
             interactive_mode = False,
@@ -1137,8 +1084,8 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -1161,8 +1108,8 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat_stream(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -1206,8 +1153,8 @@ class ApiEngine(DeployEngine):
 
     def chat(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -1221,14 +1168,16 @@ class ApiEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         # 将历史记录转换为openai格式
-        prompt: list[dict[str, str]] = [
+        messages: list[dict[str, str]] = [
             {
                 "role": "system",
                 "content": self.config.system_prompt
             },
         ] + convert_to_openai_history(history, query)
-        logger.info(f"prompt: {prompt}")
+        logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
@@ -1239,11 +1188,10 @@ class ApiEngine(DeployEngine):
 
         model = self.config.model if model is None else model
         logger.info(f"use model: {model}")
-        logger.info(f"query: {query}")
 
         try:
             completion: ChatCompletion = self.client.chat.completions.create(
-                messages = prompt,
+                messages = messages,
                 model = model,
                 max_tokens = max_new_tokens,
                 n = 1,                      # 为每条输入消息生成多少个结果，默认为 1
@@ -1290,8 +1238,8 @@ class ApiEngine(DeployEngine):
 
     def chat_stream(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -1305,14 +1253,16 @@ class ApiEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        logger.info(f"query: {query}")
+
         # 将历史记录转换为openai格式
-        prompt = [
+        messages = [
             {
                 "role": "system",
                 "content": self.config.system_prompt
             },
         ] + convert_to_openai_history(history, query)
-        logger.info(f"prompt: {prompt}")
+        logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
@@ -1323,11 +1273,10 @@ class ApiEngine(DeployEngine):
 
         model = self.config.model if model is None else model
         logger.info(f"use model: {model}")
-        logger.info(f"query: {query}")
 
         try:
             completion: ChatCompletion = self.client.chat.completions.create(
-                messages = prompt,
+                messages = messages,
                 model = model,
                 max_tokens = max_new_tokens,
                 n = 1,                      # 为每条输入消息生成多少个结果，默认为 1
@@ -1408,8 +1357,8 @@ class InferEngine(DeployEngine):
 
     def chat(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -1420,8 +1369,8 @@ class InferEngine(DeployEngine):
         """一次返回完整回答
 
         Args:
-            query (str): 问题
-            history (Sequence, optional): 对话历史. Defaults to [].
+            query (str | VLQueryType): 查询语句,支持图片
+            history (Sequence[Sequence], optional): 对话历史. Defaults to None.
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
             temperature (float, optional): temperature. Defaults to 0.8.
@@ -1446,8 +1395,8 @@ class InferEngine(DeployEngine):
 
     def chat_stream(
         self,
-        query: str,
-        history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
+        query: str | VLQueryType,
+        history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
         top_p: float = 0.8,
@@ -1458,8 +1407,8 @@ class InferEngine(DeployEngine):
         """流式返回回答
 
         Args:
-            query (str): 问题
-            history (Sequence, optional): 对话历史. Defaults to [].
+            query (str | VLQueryType): 查询语句,支持图片
+            history (Sequence[Sequence], optional): 对话历史. Defaults to None.
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
             temperature (float, optional): temperature. Defaults to 0.8.

@@ -16,7 +16,8 @@ from shutil import rmtree
 from modelscope import snapshot_download
 
 from vector_database import VectorDatabase
-from infer_engine import InferEngine, LmdeployConfig, convert_to_openai_history
+from infer_engine import InferEngine, LmdeployConfig
+from infer_utils import convert_to_openai_history
 from utils import remove_history_references, download_openxlab_dataset
 from ocr_chat import get_ernie_access_token, ocr_detection
 
@@ -164,6 +165,7 @@ def chat(
     # 是否是有效的问题
     query = query.strip()
     if query == None or len(query) < 1:
+        logger.warning(f"query is None, return history")
         yield history
         return
     logger.info(f"query: {query}")
@@ -222,6 +224,7 @@ def regenerate(
             session_id = session_id,
         )
     else:
+        logger.warning(f"no history, can't regenerate")
         yield history
 
 
@@ -262,12 +265,16 @@ def ocr_chat(img, query, history: list, current_img: str):
         return "", history, current_img
     try:
         res = requests.request("POST", url, headers=headers, data=payload).json()
+        logger.info(f"{res = }")
         response = res['result']
+        logger.info(f"{query = }")
+        logger.info(f"{response = }")
         history.append([query, response])
         logger.info(f"{history = }")
 
         return "", history, current_img
     except Exception as e:
+        logger.error(f"{e = }")
         return e, history, current_img
 
 
