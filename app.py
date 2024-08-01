@@ -77,12 +77,12 @@ snapshot_download(
 )
 
 # 下载数据集,不会重复下载
-download_openxlab_dataset(
-    dataset_repo = 'NagatoYuki0943/PigDiseaseDataset',
-    target_path = DATA_PATH,
-    access_key = openxlab_access_key,
-    secret_key = openxlab_secret_key
-)
+# download_openxlab_dataset(
+#     dataset_repo = 'NagatoYuki0943/PigDiseaseDataset',
+#     target_path = DATA_PATH,
+#     access_key = openxlab_access_key,
+#     secret_key = openxlab_secret_key
+# )
 
 # 向量数据库
 vector_database = VectorDatabase(
