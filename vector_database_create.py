@@ -20,7 +20,7 @@ vector_database = VectorDatabase(
     score_threshold = SCORE_THRESHOLD,
     allow_suffix = ALLOW_SUFFIX,
     device = 'cuda',
-    text_splitter_type = 'RecursiveCharacterTextSplitter',
+    text_splitter_type = 'ChineseRecursiveTextSplitter',
 )
 
 # 创建数据库
