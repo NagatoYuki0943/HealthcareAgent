@@ -57,6 +57,9 @@ SYSTEM_PROMPT = """
     - "AnimalHeathcareAgent" 可以使用用户选择的语言（如英语和中文）进行理解和交流。
 """
 
+REJECT_PROMPT = """你是动物医疗保健智能体 "AnimalHeathcareAgent"。您当前的问题在数据库中无法检索到,请换个问题试试。
+"""
+
 TEMPLATE = """上下文:
 <context>
 {context}
@@ -126,8 +129,12 @@ def chat(
     )
 
     # 格式化rag文件
-    prompt = TEMPLATE.format(context = documents_str, question = query) if documents_str else query
-    logger.info(f"prompt: {prompt}")
+    if documents_str:
+        prompt = TEMPLATE.format(context = documents_str, question = query)
+        logger.info(f"prompt: {prompt}")
+    else:
+        yield history + [[query, REJECT_PROMPT]]
+        return
 
     # 给模型的历史记录去除参考文档
     history_without_reference = remove_history_references(history = history)
