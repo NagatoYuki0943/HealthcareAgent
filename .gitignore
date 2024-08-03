@@ -4,5 +4,7 @@ __pycache__/
 
 models/
 work_dirs/
-# data/
+data/
 vector_db/
+
+!data/PigDiseaseDataset
