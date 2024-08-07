@@ -519,7 +519,7 @@ class LmdeployLocalEngine(LmdeployEngine):
     def __init__(self, config: LmdeployConfig) -> None:
         super().__init__(config)
 
-        from lmdeploy import pipeline
+        from lmdeploy import pipeline, VisionConfig
         from lmdeploy.serve.async_engine import AsyncEngine
         from lmdeploy.serve.vl_async_engine import VLAsyncEngine
 
@@ -531,7 +531,8 @@ class LmdeployLocalEngine(LmdeployEngine):
             model_name = None,
             backend_config = self.backend_config,
             chat_template_config = self.chat_template_config,
-            log_level = config.log_level
+            log_level = config.log_level,
+            vision_config = VisionConfig(thread_safe=True) # https://github.com/InternLM/lmdeploy/issues/2101
         )
         self.use_vl_engine = isinstance(self.pipe, VLAsyncEngine)
         logger.info(f"pipe: {self.pipe}")
