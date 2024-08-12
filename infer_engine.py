@@ -458,7 +458,6 @@ class LmdeployEngine(DeployEngine):
             # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#turbomindengineconfig
             # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
             self.backend_config = TurbomindEngineConfig(
-                model_name = config.model_name,
                 model_format = config.model_format, # The format of input model. `hf` meaning `hf_llama`, `llama` meaning `meta_llama`, `awq` meaning the quantized model by awq. Default: None. Type: str
                 tp = config.tp,                     # Tensor Parallelism.
                 session_len = None,                 # the max session length of a sequence, default to None
@@ -479,12 +478,10 @@ class LmdeployEngine(DeployEngine):
             # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#pytorchengineconfig
             # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/messages.py
             self.backend_config = PytorchEngineConfig(
-                model_name = config.model_name,
                 tp = config.tp,                     # Tensor Parallelism.
                 session_len = None,                 # the max session length of a sequence, default to None
                 max_batch_size = config.max_batch_size,
                 cache_max_entry_count = config.cache_max_entry_count,
-                eviction_type = 'recompute',
                 prefill_interval = 16,
                 block_size = 64,
                 num_cpu_blocks = 0,
@@ -493,12 +490,14 @@ class LmdeployEngine(DeployEngine):
                 max_prefill_token_num = 4096,
                 thread_safe = False,
                 enable_prefix_caching = False,
+                device_type = 'cuda',
                 download_dir = None,
                 revision = None,
             )
         logger.info(f"lmdeploy backend_config: {self.backend_config}")
 
-        # https://lmdeploy.readthedocs.io/zh-cn/latest/_modules/lmdeploy/model.html#ChatTemplateConfig
+        # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#chattemplateconfig
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/model.py
         self.chat_template_config = ChatTemplateConfig(
             model_name = config.model_name, # All the chat template names: `lmdeploy list`
             system = None,
@@ -526,6 +525,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/api.py
         # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/async_engine.py
+        # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/vl_async_engine.py
         self.pipe: AsyncEngine | VLAsyncEngine = pipeline(
             model_path = config.model_path,
             model_name = None,
