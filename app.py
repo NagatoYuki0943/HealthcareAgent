@@ -65,6 +65,8 @@ PERSIST_DIRECTORY: str = "./vector_db/faiss"
 SIMILARITY_TOP_K: int = 5
 SCORE_THRESHOLD: float = 0.15
 ALLOW_SUFFIX: tuple[str] = (".txt", ".md", ".docx", ".doc", ".pdf")
+VECTOR_DEVICE = 'cpu'
+TEXT_SPLITTER_TYPE = 'RecursiveCharacterTextSplitter'
 
 # 下载 embedding 和 reranker 模型,不会重复下载
 snapshot_download(
@@ -93,8 +95,8 @@ vector_database = VectorDatabase(
     similarity_top_k = SIMILARITY_TOP_K,
     score_threshold = SCORE_THRESHOLD,
     allow_suffix = ALLOW_SUFFIX,
-    device = 'cpu',
-    text_splitter_type = 'RecursiveCharacterTextSplitter',
+    device = VECTOR_DEVICE,
+    text_splitter_type = TEXT_SPLITTER_TYPE,
 )
 # 创建数据库
 vector_database.create_faiss_vectordb(force=False)
