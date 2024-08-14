@@ -380,6 +380,6 @@ for query in querys:
     end = time.time()
     logger.warning(f"search time: {end - start}")
     time_sum += end - start
-    logger.info(f"documents_str: {documents_str}")
+    # logger.info(f"documents_str: {documents_str}")
 
-logger.error(f"average search time: {time_sum / len(query)}")
+logger.error(f"average search time: {time_sum / len(querys)}")
