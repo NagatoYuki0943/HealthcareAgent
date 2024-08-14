@@ -25,7 +25,8 @@ class VectorDatabase:
         embedding_model_path: str = "./models/bce-embedding-base_v1",
         reranker_model_path : str | None = "./models/bce-reranker-base_v1",
         persist_directory: str = "./vector_db/faiss",
-        similarity_top_k: int = 5,
+        similarity_top_k: int = 4,
+        similarity_fetch_k: int = 20,
         score_threshold: float = 0.15,
         allow_suffix: tuple[str] | str = (".txt", ".md", ".docx", ".doc", ".pdf"),
         device: str = 'cuda',
@@ -37,7 +38,8 @@ class VectorDatabase:
             embedding_model_path (str, optional): embedding 模型路径. Defaults to "./models/bce-embedding-base_v1".
             reranker_model_path (str | None, optional): embedding 模型路径,可以为空,使用 rerank 必须提供. Defaults to "./models/bce-reranker-base_v1".
             persist_directory (str, optional): 数据持久化路径. Defaults to "./vector_db/faiss".
-            similarity_top_k (int, optional): 相似数据 top_k. Defaults to 5.
+            similarity_top_k (int, optional): 相似度 top_k. Defaults to 4.
+            similarity_fetch_k (int, optional): 相似度 fetch_k, faiss 需要. Defaults to 20.
             score_threshold (float, optional): 最低分数. Defaults to 0.15.
             allow_suffix (tuple[str] | str, optional): 读取文件的后缀. Defaults to (".txt", ".md", ".docx", ".doc", ".pdf").
             device (str, optional): embedding 和 reranker 模型使用的设备, 比如 [cuda, cuda:0, cpu]. Defaults cuda.
@@ -47,6 +49,7 @@ class VectorDatabase:
         self.embedding_model_path = embedding_model_path
         self.reranker_model_path = reranker_model_path
         self.similarity_top_k = similarity_top_k
+        self.similarity_fetch_k = similarity_fetch_k
         self.score_threshold = score_threshold
         self.allow_suffix = allow_suffix
         self.device = device
@@ -202,7 +205,7 @@ class VectorDatabase:
             search_kwargs = {
                 "k": self.similarity_top_k,
                 "score_threshold": self.score_threshold,
-                "fetch_k": self.similarity_top_k * 5
+                "fetch_k": self.similarity_fetch_k
             }
         )
         # 清除未使用缓存
@@ -220,7 +223,7 @@ class VectorDatabase:
         retriever: VectorStoreRetriever = self.vectordb.as_retriever(
             search_type = "similarity_score_threshold",
             search_kwargs = {
-                "k": self.similarity_top_k * 5,
+                "k": self.similarity_fetch_k,
                 "score_threshold": self.score_threshold,
             }
         )
