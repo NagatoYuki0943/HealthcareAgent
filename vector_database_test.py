@@ -377,9 +377,9 @@ for query in querys:
     documents_str, references_str = vector_database.similarity_search(
         query = query,
     )
-    logger.info(f"documents_str: {documents_str}")
     end = time.time()
     logger.warning(f"search time: {end - start}")
     time_sum += end - start
+    logger.info(f"documents_str: {documents_str}")
 
 logger.error(f"average search time: {time_sum / len(query)}")
