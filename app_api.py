@@ -1,28 +1,94 @@
+# fix chroma sqlite3 error
+# refer: https://github.com/chroma-core/chroma/issues/1985#issuecomment-2055963683
+# __import__('pysqlite3')
+# import sys
+# sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import os
 import gradio as gr
 from typing import Generator, Sequence
 import threading
+import cv2
+import json
+import requests
 from loguru import logger
-from infer_engine import InferEngine, TransformersConfig, LmdeployConfig
+from shutil import rmtree
+from modelscope import snapshot_download
+
 from vector_database import VectorDatabase
-from utils import remove_history_references
+from infer_engine import InferEngine, ApiConfig
+from infer_utils import convert_to_openai_history
+from utils import remove_history_references, download_openxlab_dataset
+from ocr_chat import get_ernie_access_token, ocr_detection
 
 
 log_file = logger.add('log/runtime_{time}.log', rotation='00:00')
 logger.info(f"gradio version: {gr.__version__}")
 
 
-DATA_PATH: str  = "./data"
-EMBEDDING_MODEL_PATH: str  = "./models/bce-embedding-base_v1"
+"""
+设置临时变量
+
+linux:
+    export HF_TOKEN="your token"
+
+powershell:
+    $env:HF_TOKEN = "your token"
+
+"""
+# 获取环境变量
+openxlab_access_key = os.getenv("OPENXLAB_AK", "")
+openxlab_secret_key = os.getenv("OPENXLAB_SK", "")
+logger.info(f"{openxlab_access_key = }")
+logger.info(f"{openxlab_secret_key = }")
+
+# ------------------------腾讯OCR API-----------------------------#
+ocr_secret_id = os.getenv("OCR_SECRET_ID", "")
+ocr_secret_key = os.getenv("OCR_SECRET_KEY", "")
+logger.info(f"{ocr_secret_id = }")
+logger.info(f"{ocr_secret_key = }")
+
+# -------------------------文心一言 API---------------------------#
+ernie_api_key = os.getenv("ERNIE_API_KEY", "")
+ernie_secret_key = os.getenv("ERNIE_SECRET_KEY", "")
+logger.info(f"{ernie_api_key = }")
+logger.info(f"{ernie_secret_key = }")
+
+# -------------------------silicon API---------------------------#
+api_key = os.getenv("API_KEY", "")
+logger.info(f"{api_key = }")
+
+
+DATA_PATH: str = "./data"
+EMBEDDING_MODEL_PATH: str = "./models/bce-embedding-base_v1"
 RERANKER_MODEL_PATH: str = "./models/bce-reranker-base_v1"
-PERSIST_DIRECTORY: str  = "./vector_db/faiss"
+PERSIST_DIRECTORY: str = "./vector_db/faiss"
 SIMILARITY_TOP_K: int = 4
 SIMILARITY_FETCH_K: int = 10
 SCORE_THRESHOLD: float = 0.15
 ALLOW_SUFFIX: tuple[str] = (".txt", ".md", ".docx", ".doc", ".pdf")
 VECTOR_DEVICE = 'cuda'
-TEXT_SPLITTER_TYPE = 'ChineseRecursiveTextSplitter'
+TEXT_SPLITTER_TYPE = 'RecursiveCharacterTextSplitter'
 
+# 下载 embedding 和 reranker 模型,不会重复下载
+snapshot_download(
+    "maidalun/bce-embedding-base_v1",
+    local_dir = EMBEDDING_MODEL_PATH,
+)
+snapshot_download(
+    "maidalun/bce-reranker-base_v1",
+    local_dir = RERANKER_MODEL_PATH,
+)
+
+# 下载数据集,不会重复下载
+download_openxlab_dataset(
+    dataset_repo = 'NagatoYuki0943/FMdocs',
+    target_path = DATA_PATH,
+    access_key = openxlab_access_key,
+    secret_key = openxlab_secret_key
+)
+
+# 向量数据库
 vector_database = VectorDatabase(
     data_path = DATA_PATH,
     embedding_model_path = EMBEDDING_MODEL_PATH,
@@ -44,25 +110,11 @@ vector_database.load_faiss_vectordb()
 # 创建重排序 retriever
 vector_database.create_faiss_reranker_retriever()
 
-# clone 模型
-PRETRAINED_MODEL_NAME_OR_PATH = "./models/internlm2-chat-1_8b"
-# os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-1.8b {PRETRAINED_MODEL_NAME_OR_PATH}')
-# os.system(f'cd {PRETRAINED_MODEL_NAME_OR_PATH} && git lfs pull')
-ADAPTER_PATH = None
-# 量化
-LOAD_IN_8BIT = False
-LOAD_IN_4BIT = False
-
 SYSTEM_PROMPT = """
-你是动物医疗保健智能体，名字叫做 "AnimalHeathcareAgent"。
-    - "AnimalHeathcareAgent" 应严格依据权威知识来构建回答。
-    - "AnimalHeathcareAgent" 的回答应该是有益的、诚实的、无害的，并且忠实于原文信息。
-    - "AnimalHeathcareAgent" 能够准确理解和使用专业术语，特别是在区分兽医和人医术语时。
-    - "AnimalHeathcareAgent" 应具备对模棱两可概念的明确判断标准，确保概念的清晰区分，例如病毒与疾病。
-    - "AnimalHeathcareAgent" 可以使用用户选择的语言（如英语和中文）进行理解和交流。
-"""
-
-REJECT_PROMPT = """你是动物医疗保健智能体 "AnimalHeathcareAgent"。您当前的问题在数据库中无法检索到,请换个问题试试。
+你是医疗保健智能体，名字叫做 "HeathcareAgent"。
+    - "HeathcareAgent" 可以根据自己丰富的医疗知识来回答问题。
+    - "HeathcareAgent" 的回答应该是有益的、诚实的和无害的。
+    - "HeathcareAgent" 可以使用用户选择的语言（如英语和中文）进行理解和交流。
 """
 
 TEMPLATE = """上下文:
@@ -71,36 +123,19 @@ TEMPLATE = """上下文:
 </context>
 问题:
 <question>{question}</question>
-请使用提供的上下文来回答问题，回答内容应严格限定在给出的的知识范围内。如果上下文信息不足，就说无法回答。回答应有条理，使用正确的专业术语，并明确区分相关概念：
-"""
+请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理(除非用户指定了回答的语言，否则用户使用什么语言就用什么语言回答):"""
 # 请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理:"""
 
-TRANSFORMERS_CONFIG = TransformersConfig(
-    pretrained_model_name_or_path = PRETRAINED_MODEL_NAME_OR_PATH,
-    adapter_path = ADAPTER_PATH,
-    load_in_8bit = LOAD_IN_8BIT,
-    load_in_4bit = LOAD_IN_4BIT,
-    model_name = 'internlm2',
-    system_prompt = SYSTEM_PROMPT
-)
-
-LMDEPLOY_CONFIG = LmdeployConfig(
-    model_path = PRETRAINED_MODEL_NAME_OR_PATH,
-    backend = 'turbomind',
-    model_name = 'internlm2',
-    model_format = 'hf',
-    cache_max_entry_count = 0.5,    # 调整 KV Cache 的占用比例为0.5
-    quant_policy = 0,               # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
-    system_prompt = SYSTEM_PROMPT,
-    deploy_method = 'local',
-    log_level = 'ERROR'
+API_CONFIG = ApiConfig(
+    base_url = "https://api.siliconflow.cn/v1",
+    api_key = api_key,
+    model = "internlm/internlm2_5-7b-chat",
 )
 
 # 载入模型
 infer_engine = InferEngine(
-    backend = 'transformers', # transformers, lmdeploy, api
-    transformers_config = TRANSFORMERS_CONFIG,
-    lmdeploy_config = LMDEPLOY_CONFIG
+    backend = 'api', # transformers, lmdeploy, api
+    api_config = API_CONFIG
 )
 
 
@@ -134,12 +169,8 @@ def chat(
     )
 
     # 格式化rag文件
-    if documents_str:
-        prompt = TEMPLATE.format(context = documents_str, question = query)
-        logger.info(f"prompt: {prompt}")
-    else:
-        yield history + [[query, REJECT_PROMPT]]
-        return
+    prompt = TEMPLATE.format(context = documents_str, question = query) if documents_str else query
+    logger.info(f"prompt: {prompt}")
 
     # 给模型的历史记录去除参考文档
     history_without_reference = remove_history_references(history = history)
@@ -199,6 +230,47 @@ def revocery(history: Sequence | None = None) -> tuple[str, Sequence]:
     return query, history
 
 
+def ocr_chat(img, query, history: list, current_img: str):
+    logger.info(f"{img = }")
+    logger.info(f"{current_img = }")
+
+    # 有图片且图片不是之前的图片才使用ocr
+    if img != None and img != current_img:
+        logger.warning(f"use ocr")
+        ocr_result: str = ocr_detection(img, ocr_secret_id, ocr_secret_key)
+        txt = f"图片ocr检测结果:\n<ocr>\n{ocr_result}\n</ocr>\n question: {query}"
+        current_img = img
+    else:
+        txt = query
+    logger.info(f"{txt = }")
+
+    url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-speed-128k?access_token=" + get_ernie_access_token(ernie_api_key, ernie_secret_key)
+
+    # 将历史记录转换为openai格式
+    prompts = convert_to_openai_history(history, txt)
+    logger.info(f"{prompts = }")
+    payload = json.dumps({"messages": prompts})
+    headers = {
+        'Content-Type': 'application/json'
+    }
+
+    if query == None and img == None:
+        return "", history, current_img
+    try:
+        res = requests.request("POST", url, headers=headers, data=payload).json()
+        logger.info(f"{res = }")
+        response = res['result']
+        logger.info(f"{query = }")
+        logger.info(f"{response = }")
+        history.append([query, response])
+        logger.info(f"{history = }")
+
+        return "", history, current_img
+    except Exception as e:
+        logger.error(f"{e = }")
+        return e, history, current_img
+
+
 def main() -> None:
     block = gr.Blocks()
     with block as demo:
@@ -206,8 +278,31 @@ def main() -> None:
 
         with gr.Row(equal_height=True):
             with gr.Column(scale=15):
-                gr.Markdown("""<h1><center>Animal Healthcare Agent</center></h1>""")
+                gr.Markdown("""<h1><center>Healthcare Agent</center></h1>""")
             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
+
+
+        # 化验报告分析页面
+        with gr.Tab("化验报告分析"):
+            # 用来存放ocr图片路径，防止重复使用ocr
+            current_img = gr.State("")
+
+            gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>""")
+            with gr.Row():
+                img_chatbot = gr.Chatbot(height=450, show_copy_button=True)
+                img_show = gr.Image(sources=["upload", "webcam", "clipboard"], type="filepath", label="输入的化验报告图片", height=450)
+
+            with gr.Row():
+                question = gr.Textbox(label="Prompt/问题", scale=2)
+                # img_intput = gr.UploadButton('📁', elem_id='upload', file_types=['image'], scale=0)
+                # print(img_intput.name)
+                subbt = gr.Button(value="Chat", variant="primary", scale=0)
+                # 创建一个清除按钮，用于清除聊天机器人组件的内容。
+                clear = gr.ClearButton(components=[img_chatbot, img_show, current_img], value="Clear", variant="stop", scale=0)
+
+        subbt.click(ocr_chat, inputs=[img_show, question, img_chatbot, current_img], outputs=[question, img_chatbot, current_img])
+        question.submit(ocr_chat, inputs=[img_show, question, img_chatbot, current_img], outputs=[question, img_chatbot, current_img])
+
 
         # 智能问答页面
         with gr.Tab("医疗智能问答"):
@@ -233,8 +328,9 @@ def main() -> None:
 
                     gr.Examples(
                         examples=[
-                            ["母猪产奶量不足可能有什么原因？"],
-                            ["猪流感有什么防止措施，如果猪得了猪流感改怎么治疗？"],
+                            ["维生素E有什么作用，请详细说明"],
+                            ["维生素C对治疗眼睛疾病有什么作用，请详细说明"],
+                            ["Please explain the effect of vitamin C on the treatment of eye diseases"]
                         ],
                         inputs=[query],
                         label="示例问题 / Example questions"
@@ -260,7 +356,7 @@ def main() -> None:
                             temperature = gr.Slider(
                                 minimum=0.01,
                                 maximum=2,
-                                value=0.3,
+                                value=0.8,
                                 step=0.01,
                                 label='Temperature'
                             )
@@ -344,7 +440,11 @@ def main() -> None:
     )
 
     # demo.launch(server_name = "127.0.0.1", server_port = 7860, share = True, max_threads = 40)
-    demo.launch(max_threads = 40)
+    demo.launch(
+        server_name = "127.0.0.1",
+        server_port = 7860,
+        max_threads = 40
+    )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import time
 from vector_database import VectorDatabase
 from loguru import logger
+from tqdm import tqdm
 
 
 DATA_PATH: str  = "./data"
@@ -372,16 +373,17 @@ querys = [
 ]
 
 
+querys_len = len(querys)
 time_sum = 0
-for query in querys:
+for i, query in enumerate(querys):
     start = time.time()
     # 数据库检索
     documents_str, references_str = vector_database.similarity_search(
         query = query,
     )
     end = time.time()
-    logger.warning(f"search time: {end - start}")
     time_sum += end - start
-    # logger.info(f"documents_str: {documents_str}")
+    logger.warning(f"{i+1}/{querys_len} search time: {end - start}")
+    # logger.info(f"{i+1}/{querys_len} sdocuments_str: {documents_str}")
 
-logger.error(f"average search time: {time_sum / len(querys)}")
+logger.error(f"average search time: {time_sum / querys_len}")

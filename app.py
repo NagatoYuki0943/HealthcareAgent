@@ -22,6 +22,7 @@ from utils import remove_history_references, download_openxlab_dataset
 from ocr_chat import get_ernie_access_token, ocr_detection
 
 
+log_file = logger.add('log/runtime_{time}.log', rotation='00:00')
 logger.info(f"gradio version: {gr.__version__}")
 
 
@@ -43,20 +44,20 @@ powershell:
 # 获取环境变量
 openxlab_access_key = os.getenv("OPENXLAB_AK", "")
 openxlab_secret_key = os.getenv("OPENXLAB_SK", "")
-print(f"{openxlab_access_key = }")
-print(f"{openxlab_secret_key = }")
+logger.info(f"{openxlab_access_key = }")
+logger.info(f"{openxlab_secret_key = }")
 
 # ------------------------腾讯OCR API-----------------------------#
 ocr_secret_id = os.getenv("OCR_SECRET_ID", "")
 ocr_secret_key = os.getenv("OCR_SECRET_KEY", "")
-print(f"{ocr_secret_id = }")
-print(f"{ocr_secret_key = }")
+logger.info(f"{ocr_secret_id = }")
+logger.info(f"{ocr_secret_key = }")
 
 # -------------------------文心一言 API---------------------------#
 ernie_api_key = os.getenv("ERNIE_API_KEY", "")
 ernie_secret_key = os.getenv("ERNIE_SECRET_KEY", "")
-print(f"{ernie_api_key = }")
-print(f"{ernie_secret_key = }")
+logger.info(f"{ernie_api_key = }")
+logger.info(f"{ernie_secret_key = }")
 
 DATA_PATH: str = "./data"
 EMBEDDING_MODEL_PATH: str = "./models/bce-embedding-base_v1"
