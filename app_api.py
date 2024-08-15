@@ -71,22 +71,22 @@ VECTOR_DEVICE = 'cuda'
 TEXT_SPLITTER_TYPE = 'RecursiveCharacterTextSplitter'
 
 # 下载 embedding 和 reranker 模型,不会重复下载
-# snapshot_download(
-#     "maidalun/bce-embedding-base_v1",
-#     local_dir = EMBEDDING_MODEL_PATH,
-# )
-# snapshot_download(
-#     "maidalun/bce-reranker-base_v1",
-#     local_dir = RERANKER_MODEL_PATH,
-# )
+snapshot_download(
+    "maidalun/bce-embedding-base_v1",
+    local_dir = EMBEDDING_MODEL_PATH,
+)
+snapshot_download(
+    "maidalun/bce-reranker-base_v1",
+    local_dir = RERANKER_MODEL_PATH,
+)
 
 # 下载数据集,不会重复下载
-# download_openxlab_dataset(
-#     dataset_repo = 'NagatoYuki0943/FMdocs',
-#     target_path = DATA_PATH,
-#     access_key = openxlab_access_key,
-#     secret_key = openxlab_secret_key
-# )
+download_openxlab_dataset(
+    dataset_repo = 'NagatoYuki0943/FMdocs',
+    target_path = DATA_PATH,
+    access_key = openxlab_access_key,
+    secret_key = openxlab_secret_key
+)
 
 # 向量数据库
 vector_database = VectorDatabase(
