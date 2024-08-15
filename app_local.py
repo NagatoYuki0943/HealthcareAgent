@@ -8,6 +8,7 @@ from vector_database import VectorDatabase
 from utils import remove_history_references
 
 
+log_file = logger.add('log/runtime_{time}.log', rotation='00:00')
 logger.info(f"gradio version: {gr.__version__}")
 
 

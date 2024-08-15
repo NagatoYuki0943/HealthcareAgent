@@ -22,6 +22,7 @@ from utils import remove_history_references, download_openxlab_dataset
 from ocr_chat import get_ernie_access_token, ocr_detection
 
 
+log_file = logger.add('log/runtime_{time}.log', rotation='00:00')
 logger.info(f"gradio version: {gr.__version__}")
 
 

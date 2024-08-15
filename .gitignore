@@ -6,3 +6,4 @@ models/
 work_dirs/
 data/
 vector_db/
+log/
