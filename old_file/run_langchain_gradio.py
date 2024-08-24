@@ -9,7 +9,7 @@ class ModelCenter():
     """
     def __init__(self):
         self.chain = load_chain(
-            llm_path = "./models/internlm2-chat-1_8b",
+            llm_path = "./models/internlm2_5-1_8b-chat",
             embedding_model_name = "./models/sentence-transformer",
             persist_directory = "./vector_db/chroma",
             adapter_dir = None,

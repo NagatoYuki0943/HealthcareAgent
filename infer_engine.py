@@ -161,7 +161,7 @@ class TransfomersEngine(DeployEngine):
 
         logger.info(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
 
-    # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1136-L1146
+    # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1136-L1146
     def build_inputs(
         self,
         tokenizer,
@@ -218,7 +218,7 @@ class TransfomersEngine(DeployEngine):
         # logger.info(f"prompt_template: \n{prompt}")
         return prompt, tokenizer([prompt], return_tensors="pt")
 
-    # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1148-L1182
+    # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1148-L1182
     @torch.no_grad()
     def __chat(
         self,
@@ -260,7 +260,7 @@ class TransfomersEngine(DeployEngine):
         history = history + [(query, response)]
         return response, history
 
-    # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1184-L1268
+    # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1184-L1268
     @torch.no_grad()
     def __stream_chat(
         self,
@@ -374,7 +374,7 @@ class TransfomersEngine(DeployEngine):
             "top_k": top_k,
         }))
 
-        # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
+        # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1149
         # response, history = self.model.chat( # only for internlm2
         response, history = self.__chat(
             tokenizer = self.tokenizer,
@@ -415,7 +415,7 @@ class TransfomersEngine(DeployEngine):
             "top_k": top_k,
         }))
 
-        # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
+        # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1185
         # stream_chat 返回的句子长度是逐渐边长的,length的作用是记录之前的输出长度,用来截断之前的输出
         # for response, history in self.model.stream_chat( # only for internlm2
         for response, history in self.__stream_chat(
