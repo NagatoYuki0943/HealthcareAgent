@@ -6,7 +6,7 @@ from langchain.chains import RetrievalQA
 
 
 def load_chain(
-    llm_path: str = "./models/internlm2-chat-1_8b",
+    llm_path: str = "./models/internlm2_5-1_8b-chat",
     embedding_model_name: str = "./models/sentence-transformer",
     persist_directory: str = "./vector_db/chroma",
     adapter_dir: str = None,
