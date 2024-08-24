@@ -55,8 +55,8 @@ def load_model(
 
 if __name__ == '__main__':
     # clone 模型
-    pretrained_model_name_or_path = "../models/internlm2-chat-1_8b"
-    # os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2-chat-1.8b {pretrained_model_name_or_path}')
+    pretrained_model_name_or_path = "../models/internlm2_5-1_8b-chat"
+    # os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2_5-1_8b-chat.git {pretrained_model_name_or_path}')
     # os.system(f'cd {pretrained_model_name_or_path} && git lfs pull')
     adapter_path = None
 

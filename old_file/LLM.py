@@ -87,7 +87,7 @@ class InternLM_LLM(LLM):
 
         # messages = [(system_prompt, '')]
         # response, history = self.model.chat(self.tokenizer, prompt , history=messages)
-        # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
+        # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1149
         # chat 调用的 generate
         history = []
         response, history = self.model.chat(
@@ -134,6 +134,6 @@ class InternLM_LLM(LLM):
 
 if __name__ == "__main__":
     # 测试代码
-    llm = InternLM_LLM(model_path = "./models/internlm2-chat-1_8b")
+    llm = InternLM_LLM(model_path = "./models/internlm2_5-1_8b-chat")
     # print(llm.predict("你是谁"))
     print(llm.invoke("你是谁"))

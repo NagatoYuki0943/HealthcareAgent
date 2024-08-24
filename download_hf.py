@@ -20,7 +20,7 @@ proxies = {"https": "http://localhost:7897"}
 
 EMBEDDING_MODEL_PATH: str = "./models/bce-embedding-base_v1"
 RERANKER_MODEL_PATH: str = "./models/bce-reranker-base_v1"
-MODEL_PATH = "./models/internlm2-chat-1_8b"
+MODEL_PATH = "./models/internlm2_5-1_8b-chat"
 
 
 snapshot_download(
@@ -42,7 +42,7 @@ snapshot_download(
 )
 
 snapshot_download(
-    repo_id = "internlm/internlm2-chat-1_8b",
+    repo_id = "internlm/internlm2_5-1_8b-chat",
     local_dir = MODEL_PATH,
     # proxies = proxies,
     max_workers = 8,

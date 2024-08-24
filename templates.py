@@ -196,7 +196,7 @@ def get_prompt_template(model_name: str = "internlm2"):
     return prompt_template
 
 
-# # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1136-L1146
+# # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1136-L1146
 def build_inputs_internlm2(
     query: str,
     history: list[tuple[str, str]] | None = None,
