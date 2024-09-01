@@ -177,7 +177,7 @@ def chat(
     logger.info(f"history_without_reference: {history_without_reference}")
 
     yield history + [[query, None]]
-    for response, _history in infer_engine.chat_stream(
+    for response in infer_engine.chat_stream(
         query = prompt,
         history = history_without_reference,
         max_new_tokens = max_new_tokens,

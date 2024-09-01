@@ -7,6 +7,7 @@ import uuid
 from typing import Literal, Sequence
 import random
 from loguru import logger
+from copy import deepcopy
 
 
 # 可以传递一个提示语句 + 一张或者多张 PIL.Image.Image 的图片
@@ -415,7 +416,6 @@ def convert_gradio_to_openai_format_new(
     return messages
 
 
-
 def convert_openai_to_gradio_format(
     messages: list[dict],
 ) -> tuple[str, Sequence[Sequence] | None]:
@@ -442,6 +442,8 @@ def convert_openai_to_gradio_format(
             example: 'How dare you!'
 
     """
+    # 防止修改源列表
+    messages = deepcopy(messages)
     if len(messages) == 0:
         return "", None
     if len(messages) >= 0:
