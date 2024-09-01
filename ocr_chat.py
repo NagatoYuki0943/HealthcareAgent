@@ -103,7 +103,7 @@ def get_ernie_access_token(ernie_api_key, ernie_secret_key):
 #     url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-speed-128k?access_token=" + get_ernie_access_token(ernie_api_key, ernie_secret_key)
 
 #     # 将历史记录转换为openai格式
-#     prompts = convert_to_openai_history(history, txt)
+#     prompts = convert_gradio_to_openai_history(history, txt)
 #     print(f"{prompts = }")
 #     # 注意message必须是奇数条
 #     payload = json.dumps({"messages": prompts})

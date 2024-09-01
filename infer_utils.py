@@ -77,7 +77,7 @@ def encode_image_base64(image: str | Image.Image) -> str:
 # https://platform.openai.com/docs/guides/text-generation
 # https://platform.openai.com/docs/guides/vision
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/vl/templates.py#L25-L69
-def convert_to_openai_history(
+def convert_gradio_to_openai_history(
     history: Sequence[Sequence],
     query: str | VLQueryType | None = None,
 ) -> list:
@@ -220,14 +220,14 @@ def convert_to_openai_history(
     return messages
 
 
-def test_convert_to_openai_history():
+def test_convert_gradio_to_openai_history():
     history1 = [
         ['text1', '[91 24 10 19 73]'],
         ['text2', '[85 98 95  3 25]'],
         ['text3', '[58 60 35 97 39]'],
     ]
     query = 'text4'
-    messages1 = convert_to_openai_history(history1, query)
+    messages1 = convert_gradio_to_openai_history(history1, query)
     print(messages1)
     print("\n")
     [
@@ -248,7 +248,7 @@ def test_convert_to_openai_history():
     ]
     query = ('how dare you!', Image.open('../images/openxlab.png'))
 
-    messages2 = convert_to_openai_history(history2, query)
+    messages2 = convert_gradio_to_openai_history(history2, query)
     print(messages2)
     [
         {'role': 'user', 'content': '你是谁'},
@@ -274,7 +274,7 @@ def test_convert_to_openai_history():
 # https://platform.openai.com/docs/guides/text-generation
 # https://platform.openai.com/docs/guides/vision
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/vl/templates.py#L25-L69
-def convert_to_openai_history_new(
+def convert_gradio_to_openai_history_new(
     history: Sequence[GradioChat1TuneType],
     query: str | dict | None = None,
 ) -> list:
@@ -415,14 +415,14 @@ def convert_to_openai_history_new(
     return messages
 
 
-def test_convert_to_openai_history_new():
+def test_convert_gradio_to_openai_history_new():
     history1 = [
         ['text1', '[91 24 10 19 73]'],
         ['text2', '[85 98 95  3 25]'],
         ['text3', '[58 60 35 97 39]'],
     ]
     query = 'text4'
-    messages1 = convert_to_openai_history_new(history1, query)
+    messages1 = convert_gradio_to_openai_history_new(history1, query)
     print(messages1)
     print("\n")
     [
@@ -452,7 +452,7 @@ def test_convert_to_openai_history_new():
         ]
     }
 
-    messages2 = convert_to_openai_history_new(history2, query)
+    messages2 = convert_gradio_to_openai_history_new(history2, query)
     print(messages2)
     [
         {'role': 'user', 'content': '你是谁'},
@@ -532,8 +532,8 @@ def test_convert_to_multimodal_history():
 
 
 if __name__ == '__main__':
-    test_convert_to_openai_history()
+    test_convert_gradio_to_openai_history()
     print("*" * 100)
-    test_convert_to_openai_history_new()
+    test_convert_gradio_to_openai_history_new()
     print("*" * 100)
     test_convert_to_multimodal_history()

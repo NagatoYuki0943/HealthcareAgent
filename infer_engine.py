@@ -21,7 +21,7 @@ import re
 from loguru import logger
 
 from templates import get_prompt_template
-from infer_utils import random_uuid_int, convert_to_openai_history, VLQueryType
+from infer_utils import random_uuid_int, convert_gradio_to_openai_history, VLQueryType
 
 
 @dataclass
@@ -773,7 +773,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"query: {query}")
 
         # 将历史记录转换为openai格式
-        messages = convert_to_openai_history(history, query)
+        messages = convert_gradio_to_openai_history(history, query)
         logger.info(f"messages: {messages}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
@@ -834,7 +834,7 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"query: {query}")
 
         # 将历史记录转换为openai格式
-        messages = convert_to_openai_history(history, query)
+        messages = convert_gradio_to_openai_history(history, query)
         logger.info(f"messages: {messages}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
@@ -935,7 +935,7 @@ class LmdeployServeEngine(LmdeployEngine):
         logger.info(f"query: {query}")
 
         # 将历史记录转换为openai格式
-        messages = convert_to_openai_history(history, query)
+        messages = convert_gradio_to_openai_history(history, query)
         logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
@@ -1042,7 +1042,7 @@ class LmdeployServeEngine(LmdeployEngine):
         logger.info(f"query: {query}")
 
         # 将历史记录转换为openai格式
-        messages = convert_to_openai_history(history, query)
+        messages = convert_gradio_to_openai_history(history, query)
         logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
@@ -1177,7 +1177,7 @@ class ApiEngine(DeployEngine):
                 "role": "system",
                 "content": self.config.system_prompt
             },
-        ] + convert_to_openai_history(history, query)
+        ] + convert_gradio_to_openai_history(history, query)
         logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
@@ -1262,7 +1262,7 @@ class ApiEngine(DeployEngine):
                 "role": "system",
                 "content": self.config.system_prompt
             },
-        ] + convert_to_openai_history(history, query)
+        ] + convert_gradio_to_openai_history(history, query)
         logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
