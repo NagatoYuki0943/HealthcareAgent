@@ -17,7 +17,7 @@ from modelscope import snapshot_download
 
 from vector_database import VectorDatabase
 from infer_engine import InferEngine, ApiConfig
-from infer_utils import convert_to_openai_history
+from infer_utils import convert_gradio_to_openai_format
 from utils import remove_history_references, download_openxlab_dataset
 from ocr_chat import get_ernie_access_token, ocr_detection
 
@@ -177,7 +177,7 @@ def chat(
     logger.info(f"history_without_reference: {history_without_reference}")
 
     yield history + [[query, None]]
-    for response, _history in infer_engine.chat_stream(
+    for response in infer_engine.chat_stream(
         query = prompt,
         history = history_without_reference,
         max_new_tokens = max_new_tokens,
@@ -247,7 +247,7 @@ def ocr_chat(img, query, history: list, current_img: str):
     url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-speed-128k?access_token=" + get_ernie_access_token(ernie_api_key, ernie_secret_key)
 
     # 将历史记录转换为openai格式
-    prompts = convert_to_openai_history(history, txt)
+    prompts = convert_gradio_to_openai_format(history, txt)
     logger.info(f"{prompts = }")
     payload = json.dumps({"messages": prompts})
     headers = {
