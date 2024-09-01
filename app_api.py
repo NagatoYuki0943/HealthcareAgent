@@ -439,11 +439,11 @@ def main() -> None:
         default_concurrency_limit = 40  # 最大并发限制
     )
 
-    # demo.launch(server_name = "127.0.0.1", server_port = 7860, share = True, max_threads = 40)
     demo.launch(
-        server_name = "127.0.0.1",
+        server_name = "0.0.0.0",
         server_port = 7860,
-        max_threads = 40
+        share = True,
+        max_threads = 40,
     )
 
 
