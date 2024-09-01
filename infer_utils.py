@@ -77,10 +77,10 @@ def encode_image_base64(image: str | Image.Image) -> str:
 # https://platform.openai.com/docs/guides/text-generation
 # https://platform.openai.com/docs/guides/vision
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/vl/templates.py#L25-L69
-def convert_gradio_to_openai_history(
+def convert_gradio_to_openai_format(
     history: Sequence[Sequence],
     query: str | VLQueryType | None = None,
-) -> list:
+) -> list[dict]:
     """
     将历史记录转换为openai格式
 
@@ -90,14 +90,14 @@ def convert_gradio_to_openai_history(
                 ['What is the capital of France?', 'The capital of France is Paris.'],
                 [('What is in the image?', Image1), 'There is a dog in the image.'],
             ]
-        query (str | VLQueryType | None): 查询语句,str或者dict,图片支持PIL.Image.Image或者本地文件路径/url, de
+        query (str | VLQueryType | None): 查询语句,str或者dict,图片支持PIL.Image.Image或者本地文件路径/url
             example: 你是谁?
                      ('What is in the image?', Image1)
                      ('How dare you!', [Image2, Image3])
 
     Returns:
-        list: a chat history in OpenAI format or a list of chat history.
-            [
+        list[dict]: a chat history in OpenAI format or a list of chat history.
+            example: [
                 {'role': 'user', 'content': 'What is the capital of France?'},
                 {'role': 'assistant', 'content': 'The capital of France is Paris.'},
                 {'role': 'user', 'content': [
@@ -220,14 +220,14 @@ def convert_gradio_to_openai_history(
     return messages
 
 
-def test_convert_gradio_to_openai_history():
+def test_convert_gradio_to_openai_format():
     history1 = [
         ['text1', '[91 24 10 19 73]'],
         ['text2', '[85 98 95  3 25]'],
         ['text3', '[58 60 35 97 39]'],
     ]
     query = 'text4'
-    messages1 = convert_gradio_to_openai_history(history1, query)
+    messages1 = convert_gradio_to_openai_format(history1, query)
     print(messages1)
     print("\n")
     [
@@ -248,7 +248,7 @@ def test_convert_gradio_to_openai_history():
     ]
     query = ('how dare you!', Image.open('../images/openxlab.png'))
 
-    messages2 = convert_gradio_to_openai_history(history2, query)
+    messages2 = convert_gradio_to_openai_format(history2, query)
     print(messages2)
     [
         {'role': 'user', 'content': '你是谁'},
@@ -274,10 +274,10 @@ def test_convert_gradio_to_openai_history():
 # https://platform.openai.com/docs/guides/text-generation
 # https://platform.openai.com/docs/guides/vision
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/vl/templates.py#L25-L69
-def convert_gradio_to_openai_history_new(
+def convert_gradio_to_openai_format_new(
     history: Sequence[GradioChat1TuneType],
     query: str | dict | None = None,
-) -> list:
+) -> list[dict]:
     """
     将历史记录转换为openai格式
 
@@ -293,8 +293,8 @@ def convert_gradio_to_openai_history_new(
                     {'text': 'How dare you!', 'files': [Image2, Image3]}
 
     Returns:
-        list: a chat history in OpenAI format or a list of chat history.
-            [
+        list[dict]: a chat history in OpenAI format or a list of chat history.
+            example: [
                 {'role': 'user', 'content': 'What is the capital of France?'},
                 {'role': 'assistant', 'content': 'The capital of France is Paris.'},
                 {'role': 'user', 'content': [
@@ -415,14 +415,136 @@ def convert_gradio_to_openai_history_new(
     return messages
 
 
-def test_convert_gradio_to_openai_history_new():
+
+def convert_openai_to_gradio_format(
+    messages: list[dict],
+) -> tuple[str, Sequence[Sequence] | None]:
+    """
+    将历史记录转换为openai格式
+
+    Args:
+        messages (list[dict]): a chat history in OpenAI format or a list of chat history.
+            example: [
+                {'role': 'user', 'content': 'What is the capital of France?'},
+                {'role': 'assistant', 'content': 'The capital of France is Paris.'},
+                {'role': 'user', 'content': 'What is in the image?'},
+                {'role': 'assistant', 'content': 'There is a dog in the image.'},
+                {'role': 'user', 'content': 'How dare you!'},
+            ]
+
+    Returns:
+        history (Sequence[Sequence]):聊天历史记录
+            example: [
+                ['What is the capital of France?', 'The capital of France is Paris.'],
+                [('What is in the image?', Image1), 'There is a dog in the image.'],
+            ]
+        query (str | None): 查询语句
+            example: 'How dare you!'
+
+    """
+    if len(messages) == 0:
+        return "", None
+    if len(messages) >= 0:
+        if messages[0]['role'] == 'system':
+            messages.pop(0)
+        if len(messages) == 0:
+            return "", None
+
+        # 获取查询语句
+        if len(messages) % 2 != 0:
+            # 单数,代表最后一句是查询语句
+            query: str = messages.pop(-1)['content']
+        else:
+            # 偶数,代表最后一句是回复语句
+            query = ""
+
+        # 获取历史
+        history = []
+        for i in range(0, len(messages), 2):
+            history.append((messages[i]['content'], messages[i+1]['content']))
+
+        return query, history
+
+
+def test_convert_openai_to_gradio_format():
+    messages = []
+    query, history = convert_openai_to_gradio_format(messages)
+    print(f"{query = }")
+    print(f"{history= }")
+    print()
+    # query = ''
+    # history= None
+
+    messages = [
+        {"role": "system", "content": "You are a helpful, respectful and honest assistant."}
+    ]
+    query, history = convert_openai_to_gradio_format(messages)
+    print(f"{query = }")
+    print(f"{history= }")
+    print()
+    # query = ''
+    # history= None
+
+    messages = [
+        {"role": "system", "content": "You are a helpful, respectful and honest assistant."},
+        {'role': 'user', 'content': 'What is the capital of France?'},
+    ]
+    query, history = convert_openai_to_gradio_format(messages)
+    print(f"{query = }")
+    print(f"{history= }")
+    print()
+    # query = 'What is the capital of France?'
+    # history= []
+
+    messages = [
+        {'role': 'user', 'content': 'What is the capital of France?'},
+        {'role': 'assistant', 'content': 'The capital of France is Paris.'},
+    ]
+    query, history = convert_openai_to_gradio_format(messages)
+    print(f"{query = }")
+    print(f"{history= }")
+    print()
+    # query = ''
+    # history= [('What is the capital of France?', 'The capital of France is Paris.')]
+
+    messages = [
+        {'role': 'user', 'content': 'What is the capital of France?'},
+        {'role': 'assistant', 'content': 'The capital of France is Paris.'},
+        {'role': 'user', 'content': 'What is in the image?'},
+        {'role': 'assistant', 'content': 'There is a dog in the image.'},
+        {'role': 'user', 'content': 'How dare you!'},
+    ]
+    query, history = convert_openai_to_gradio_format(messages)
+    print(f"{query = }")
+    print(f"{history= }")
+    print()
+    # query = 'How dare you!'
+    # history= [('What is the capital of France?', 'The capital of France is Paris.'), ('What is in the image?', 'There is a dog in the image.')]
+
+    messages = [
+        {"role": "system", "content": "You are a helpful, respectful and honest assistant."},
+        {'role': 'user', 'content': 'What is the capital of France?'},
+        {'role': 'assistant', 'content': 'The capital of France is Paris.'},
+        {'role': 'user', 'content': 'What is in the image?'},
+        {'role': 'assistant', 'content': 'There is a dog in the image.'},
+        {'role': 'user', 'content': 'How dare you!'},
+    ]
+    query, history = convert_openai_to_gradio_format(messages)
+    print(f"{query = }")
+    print(f"{history= }")
+    print()
+    # query = 'How dare you!'
+    # history= [('What is the capital of France?', 'The capital of France is Paris.'), ('What is in the image?', 'There is a dog in the image.')]
+
+
+def test_convert_gradio_to_openai_format_new():
     history1 = [
         ['text1', '[91 24 10 19 73]'],
         ['text2', '[85 98 95  3 25]'],
         ['text3', '[58 60 35 97 39]'],
     ]
     query = 'text4'
-    messages1 = convert_gradio_to_openai_history_new(history1, query)
+    messages1 = convert_gradio_to_openai_format_new(history1, query)
     print(messages1)
     print("\n")
     [
@@ -452,7 +574,7 @@ def test_convert_gradio_to_openai_history_new():
         ]
     }
 
-    messages2 = convert_gradio_to_openai_history_new(history2, query)
+    messages2 = convert_gradio_to_openai_format_new(history2, query)
     print(messages2)
     [
         {'role': 'user', 'content': '你是谁'},
@@ -532,8 +654,10 @@ def test_convert_to_multimodal_history():
 
 
 if __name__ == '__main__':
-    test_convert_gradio_to_openai_history()
+    test_convert_gradio_to_openai_format()
     print("*" * 100)
-    test_convert_gradio_to_openai_history_new()
+    test_convert_gradio_to_openai_format_new()
+    print("*" * 100)
+    test_convert_openai_to_gradio_format()
     print("*" * 100)
     test_convert_to_multimodal_history()

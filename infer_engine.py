@@ -21,7 +21,7 @@ import re
 from loguru import logger
 
 from templates import get_prompt_template
-from infer_utils import random_uuid_int, convert_gradio_to_openai_history, VLQueryType
+from infer_utils import random_uuid_int, convert_gradio_to_openai_format, convert_openai_to_gradio_format, VLQueryType
 
 
 @dataclass
@@ -161,7 +161,7 @@ class TransfomersEngine(DeployEngine):
 
         logger.info(f"model.device: {self.model.device}, model.dtype: {self.model.dtype}")
 
-    # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1136-L1146
+    # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1136-L1146
     def build_inputs(
         self,
         tokenizer,
@@ -218,7 +218,7 @@ class TransfomersEngine(DeployEngine):
         # logger.info(f"prompt_template: \n{prompt}")
         return prompt, tokenizer([prompt], return_tensors="pt")
 
-    # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1148-L1182
+    # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1148-L1182
     @torch.no_grad()
     def __chat(
         self,
@@ -260,7 +260,7 @@ class TransfomersEngine(DeployEngine):
         history = history + [(query, response)]
         return response, history
 
-    # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1184-L1268
+    # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1184-L1268
     @torch.no_grad()
     def __stream_chat(
         self,
@@ -353,7 +353,7 @@ class TransfomersEngine(DeployEngine):
 
     def chat(
         self,
-        query: str,
+        query: str | list[dict],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -365,7 +365,11 @@ class TransfomersEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        if isinstance(query, list) and isinstance(query[0], dict):
+            logger.info(f"openai messages: {query}")
+            query, history = convert_openai_to_gradio_format(query)
         logger.info(f"query: {query}")
+        logger.info(f"history: {history}")
 
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
@@ -374,7 +378,7 @@ class TransfomersEngine(DeployEngine):
             "top_k": top_k,
         }))
 
-        # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1149
+        # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1149
         # response, history = self.model.chat( # only for internlm2
         response, history = self.__chat(
             tokenizer = self.tokenizer,
@@ -394,7 +398,7 @@ class TransfomersEngine(DeployEngine):
 
     def chat_stream(
         self,
-        query: str,
+        query: str | list[dict],
         history: Sequence | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -406,7 +410,11 @@ class TransfomersEngine(DeployEngine):
         # session_id
         logger.info(f"{session_id = }")
 
+        if isinstance(query, list) and isinstance(query[0], dict):
+            logger.info(f"openai messages: {query}")
+            query, history = convert_openai_to_gradio_format(query)
         logger.info(f"query: {query}")
+        logger.info(f"history: {history}")
 
         logger.info("gen_config: {}".format({
             "max_new_tokens": max_new_tokens,
@@ -415,7 +423,7 @@ class TransfomersEngine(DeployEngine):
             "top_k": top_k,
         }))
 
-        # https://huggingface.co/internlm/internlm2_5-1_8b-chat/blob/main/modeling_internlm2.py#L1185
+        # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
         # stream_chat 返回的句子长度是逐渐边长的,length的作用是记录之前的输出长度,用来截断之前的输出
         # for response, history in self.model.stream_chat( # only for internlm2
         for response, history in self.__stream_chat(
@@ -756,7 +764,7 @@ class LmdeployLocalEngine(LmdeployEngine):
 
     def chat(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -771,9 +779,14 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         logger.info(f"query: {query}")
+        logger.info(f"history: {history}")
 
-        # 将历史记录转换为openai格式
-        messages = convert_gradio_to_openai_history(history, query)
+        if isinstance(query, list) and isinstance(query[0], dict):
+            # openai 格式
+            messages = query
+        else:
+            # 将 gradio 对话转换为 openai 格式
+            messages = convert_gradio_to_openai_format(history, query)
         logger.info(f"messages: {messages}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
@@ -816,7 +829,7 @@ class LmdeployLocalEngine(LmdeployEngine):
 
     def chat_stream(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -832,9 +845,14 @@ class LmdeployLocalEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         logger.info(f"query: {query}")
+        logger.info(f"history: {history}")
 
-        # 将历史记录转换为openai格式
-        messages = convert_gradio_to_openai_history(history, query)
+        if isinstance(query, list) and isinstance(query[0], dict):
+            # openai 格式
+            messages = query
+        else:
+            # 将 gradio 对话转换为 openai 格式
+            messages = convert_gradio_to_openai_format(history, query)
         logger.info(f"messages: {messages}")
 
         # https://lmdeploy.readthedocs.io/zh-cn/latest/api/pipeline.html#generationconfig
@@ -918,7 +936,7 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat_completions_v1(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -933,9 +951,15 @@ class LmdeployServeEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         logger.info(f"query: {query}")
+        logger.info(f"history: {history}")
 
-        # 将历史记录转换为openai格式
-        messages = convert_gradio_to_openai_history(history, query)
+        # 将 gradio 对话转换为 openai 格式
+        if isinstance(query, list) and isinstance(query[0], dict):
+            # openai 格式
+            messages = query
+        else:
+            # 将 gradio 对话转换为 openai 格式
+            messages = convert_gradio_to_openai_format(history, query)
         logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
@@ -1025,7 +1049,7 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat_interactive_v1(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1040,9 +1064,14 @@ class LmdeployServeEngine(LmdeployEngine):
         logger.info(f"{session_id = }")
 
         logger.info(f"query: {query}")
+        logger.info(f"history: {history}")
 
-        # 将历史记录转换为openai格式
-        messages = convert_gradio_to_openai_history(history, query)
+        if isinstance(query, list) and isinstance(query[0], dict):
+            # openai 格式
+            messages = query
+        else:
+            # 将 gradio 对话转换为 openai 格式
+            messages = convert_gradio_to_openai_format(history, query)
         logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
@@ -1085,7 +1114,7 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1109,7 +1138,7 @@ class LmdeployServeEngine(LmdeployEngine):
 
     def chat_stream(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1154,7 +1183,7 @@ class ApiEngine(DeployEngine):
 
     def chat(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1170,14 +1199,20 @@ class ApiEngine(DeployEngine):
         logger.info(f"{session_id = }")
 
         logger.info(f"query: {query}")
+        logger.info(f"history: {history}")
 
-        # 将历史记录转换为openai格式
-        messages: list[dict[str, str]] = [
+        if isinstance(query, list) and isinstance(query[0], dict):
+            # openai 格式
+            messages = query
+        else:
+            # 将 gradio 对话转换为 openai 格式
+            messages = convert_gradio_to_openai_format(history, query)
+        messages = [
             {
                 "role": "system",
                 "content": self.config.system_prompt
             },
-        ] + convert_gradio_to_openai_history(history, query)
+        ] + messages
         logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
@@ -1239,7 +1274,7 @@ class ApiEngine(DeployEngine):
 
     def chat_stream(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1255,14 +1290,20 @@ class ApiEngine(DeployEngine):
         logger.info(f"{session_id = }")
 
         logger.info(f"query: {query}")
+        logger.info(f"history: {history}")
 
-        # 将历史记录转换为openai格式
+        if isinstance(query, list) and isinstance(query[0], dict):
+            # openai 格式
+            messages = query
+        else:
+            # 将 gradio 对话转换为 openai 格式
+            messages = convert_gradio_to_openai_format(history, query)
         messages = [
             {
                 "role": "system",
                 "content": self.config.system_prompt
             },
-        ] + convert_gradio_to_openai_history(history, query)
+        ] + messages
         logger.info(f"messages: {messages}")
 
         logger.info("gen_config: {}".format({
@@ -1358,7 +1399,7 @@ class InferEngine(DeployEngine):
 
     def chat(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1370,7 +1411,7 @@ class InferEngine(DeployEngine):
         """一次返回完整回答
 
         Args:
-            query (str | VLQueryType): 查询语句,支持图片
+            query (str | VLQueryType | list[dict]): 查询语句, 支持图片, 支持 openai api 的 json 格式
             history (Sequence[Sequence], optional): 对话历史. Defaults to None.
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
@@ -1382,6 +1423,13 @@ class InferEngine(DeployEngine):
         Returns:
             tuple[str, Sequence]: 回答和历史记录
         """
+        if isinstance(query, str) and len(query) <= 0:
+            logger.warning("query is empty")
+            return "", history
+        if isinstance(query, list) and len(query) <= 0:
+            logger.warning("query is empty")
+            return "", []
+
         history = [] if history is None else list(history)
         return self.engine.chat(
             query = query,
@@ -1396,7 +1444,7 @@ class InferEngine(DeployEngine):
 
     def chat_stream(
         self,
-        query: str | VLQueryType,
+        query: str | VLQueryType | list[dict],
         history: Sequence[Sequence] | None = None,  # [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         max_new_tokens: int = 1024,
         temperature: float = 0.8,
@@ -1408,7 +1456,7 @@ class InferEngine(DeployEngine):
         """流式返回回答
 
         Args:
-            query (str | VLQueryType): 查询语句,支持图片
+            query (str | VLQueryType | list[dict]): 查询语句, 支持图片, 支持 openai api 的 json 格式
             history (Sequence[Sequence], optional): 对话历史. Defaults to None.
                 example: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
             max_new_tokens (int, optional): 单次对话返回最大长度. Defaults to 1024.
@@ -1420,6 +1468,13 @@ class InferEngine(DeployEngine):
         Yields:
             Generator[tuple[str, Sequence], None, None]: 回答和历史记录
         """
+        if isinstance(query, str) and len(query) <= 0:
+            logger.warning("query is empty")
+            return "", history
+        if isinstance(query, list) and len(query) <= 0:
+            logger.warning("query is empty")
+            return "", []
+
         history = [] if history is None else list(history)
         return self.engine.chat_stream(
             query = query,
