@@ -1414,12 +1414,9 @@ class InferEngine(DeployEngine):
         Returns:
             str: 回答
         """
-        if isinstance(query, str) and len(query) <= 0:
+        if len(query) <= 0:
             logger.warning("query is empty")
-            return "", history
-        if isinstance(query, list) and len(query) <= 0:
-            logger.warning("query is empty")
-            return "", []
+            return ""
 
         history = [] if history is None else list(history)
         return self.engine.chat(
@@ -1459,15 +1456,12 @@ class InferEngine(DeployEngine):
         Yields:
             Generator[str, None, None]: 回答
         """
-        if isinstance(query, str) and len(query) <= 0:
+        if len(query) <= 0:
             logger.warning("query is empty")
-            return "", history
-        if isinstance(query, list) and len(query) <= 0:
-            logger.warning("query is empty")
-            return "", []
+            yield ""
 
         history = [] if history is None else list(history)
-        return self.engine.chat_stream(
+        yield from self.engine.chat_stream(
             query = query,
             history = history,
             max_new_tokens = max_new_tokens,
