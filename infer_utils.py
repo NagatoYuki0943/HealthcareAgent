@@ -12,7 +12,12 @@ from copy import deepcopy
 
 # 可以传递一个提示语句 + 一张或者多张 PIL.Image.Image 的图片
 # 或者传递一个提示语句 + 一张或者多张图片的url地址或者本地地址, 后面 tuple 中的第二个 str 或者 list[str] 指的就是图片地址
-VLQueryType = tuple[str, Image.Image] | tuple[str, list[Image.Image]] | tuple[str, str] | tuple[str, list[str]]
+VLQueryType = (
+    tuple[str, Image.Image]
+    | tuple[str, list[Image.Image]]
+    | tuple[str, str]
+    | tuple[str, list[str]]
+)
 
 
 # gradio一轮的对话格式
@@ -21,19 +26,26 @@ VLQueryType = tuple[str, Image.Image] | tuple[str, list[Image.Image]] | tuple[st
 GradioChat1TuneType = list[str, str] | list[tuple[Image.Image, str], None]
 
 
-def random_uuid(dtype: Literal['int', 'str', 'bytes', 'time'] = 'int') -> int | str | bytes:
+def random_uuid(
+    dtype: Literal["int", "str", "bytes", "time"] = "int",
+) -> int | str | bytes:
     """生成随机uuid
     reference: https://github.com/vllm-project/vllm/blob/main/vllm/utils.py
     """
-    assert dtype in ['int', 'str', 'bytes', 'time'], f"unsupported dtype: {dtype}, should be in ['int', 'str', 'bytes', 'time']"
+    assert dtype in [
+        "int",
+        "str",
+        "bytes",
+        "time",
+    ], f"unsupported dtype: {dtype}, should be in ['int', 'str', 'bytes', 'time']"
 
     # uuid4: 由伪随机数得到，有一定的重复概率，该概率可以计算出来。
     uid = uuid.uuid4()
-    if dtype == 'int':
+    if dtype == "int":
         return uid.int
-    elif dtype == 'str':
+    elif dtype == "str":
         return uid.hex
-    elif dtype == 'bytes':
+    elif dtype == "bytes":
         return uid.bytes
     else:
         return uid.time
@@ -47,31 +59,30 @@ def random_uuid_int() -> int:
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/vl/utils.py#L11-L38
 def encode_image_base64(image: str | Image.Image) -> str:
     """encode raw date to base64 format."""
-    res = ''
+    res = ""
     if isinstance(image, str):
         url_or_path = image
-        if url_or_path.startswith('http'):
-            FETCH_TIMEOUT = int(os.environ.get('LMDEPLOY_FETCH_TIMEOUT', 10))
+        if url_or_path.startswith("http"):
+            FETCH_TIMEOUT = int(os.environ.get("LMDEPLOY_FETCH_TIMEOUT", 10))
             headers = {
-                'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
             }
             try:
-                response = requests.get(url_or_path,
-                                        headers=headers,
-                                        timeout=FETCH_TIMEOUT)
+                response = requests.get(
+                    url_or_path, headers=headers, timeout=FETCH_TIMEOUT
+                )
                 response.raise_for_status()
-                res = base64.b64encode(response.content).decode('utf-8')
+                res = base64.b64encode(response.content).decode("utf-8")
             except Exception:
                 pass
         elif os.path.exists(url_or_path):
-            with open(url_or_path, 'rb') as image_file:
-                res = base64.b64encode(image_file.read()).decode('utf-8')
+            with open(url_or_path, "rb") as image_file:
+                res = base64.b64encode(image_file.read()).decode("utf-8")
     elif isinstance(image, Image.Image):
         buffered = BytesIO()
-        image.save(buffered, format='PNG')
-        res = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        image.save(buffered, format="PNG")
+        res = base64.b64encode(buffered.getvalue()).decode("utf-8")
     return res
 
 
@@ -119,17 +130,19 @@ def convert_gradio_to_openai_format(
     messages = []
     for prompt, response in history:
         if isinstance(prompt, str):
-            content = prompt # 兼容不支持列表格式的模型
+            content = prompt  # 兼容不支持列表格式的模型
             # content = [{
             #     'type': 'text',
             #     'text': prompt,
             # }]
         else:
             prompt, images = prompt
-            content = [{
-                'type': 'text',
-                'text': prompt,
-            }]
+            content = [
+                {
+                    "type": "text",
+                    "text": prompt,
+                }
+            ]
             # image: PIL.Image.Image
             images = images if isinstance(images, (list, tuple)) else [images]
             for image in images:
@@ -137,138 +150,163 @@ def convert_gradio_to_openai_format(
                 # 'image_data': means PIL.Image.Image object.
                 if isinstance(image, str):
                     image_base64_data = encode_image_base64(image)
-                    if image_base64_data == '':
-                        logger.error(f'failed to load file {image}')
+                    if image_base64_data == "":
+                        logger.error(f"failed to load file {image}")
                         continue
                     item = {
-                        'type': 'image_url',
-                        'image_url': {
-                            'url':
-                            f'data:image/jpeg;base64,{image_base64_data}'
-                        }
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_base64_data}"
+                        },
                     }
                 elif isinstance(image, Image.Image):
-                    item = {
-                        'type': 'image_data',
-                        'image_data': {
-                            'data': image
-                        }
-                    }
+                    item = {"type": "image_data", "image_data": {"data": image}}
                 else:
                     raise ValueError(
-                        'image should be a str(url/path) or PIL.Image.Image')
+                        "image should be a str(url/path) or PIL.Image.Image"
+                    )
 
                 content.append(item)
-        messages.append({
-            "role": "user",
-            "content": content
-        })
+        messages.append({"role": "user", "content": content})
 
         if response is not None:
-            messages.append({
-                "role": "assistant",
-                # assistant 的回答必须是字符串,不能是数组
-                "content": response
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    # assistant 的回答必须是字符串,不能是数组
+                    "content": response,
+                }
+            )
 
     # 添加当前的query
     if query is not None:
         if isinstance(query, str):
-            content = query # 兼容不支持列表格式的模型
+            content = query  # 兼容不支持列表格式的模型
             # content = [{
             #     'type': 'text',
             #     'text': query,
             # }]
         else:
             query, images = query
-            content = [{
-                'type': 'text',
-                'text': query,
-            }]
+            content = [
+                {
+                    "type": "text",
+                    "text": query,
+                }
+            ]
             images = images if isinstance(images, (list, tuple)) else [images]
             for image in images:
                 # 'image_url': means url or local path to image.
                 # 'image_data': means PIL.Image.Image object.
                 if isinstance(image, str):
                     image_base64_data = encode_image_base64(image)
-                    if image_base64_data == '':
-                        logger.error(f'failed to load file {image}')
+                    if image_base64_data == "":
+                        logger.error(f"failed to load file {image}")
                         continue
                     item = {
-                        'type': 'image_url',
-                        'image_url': {
-                            'url':
-                            f'data:image/jpeg;base64,{image_base64_data}'
-                        }
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_base64_data}"
+                        },
                     }
                 elif isinstance(image, Image.Image):
-                    item = {
-                        'type': 'image_data',
-                        'image_data': {
-                            'data': image
-                        }
-                    }
+                    item = {"type": "image_data", "image_data": {"data": image}}
                 else:
                     raise ValueError(
-                        'image should be a str(url/path) or PIL.Image.Image')
+                        "image should be a str(url/path) or PIL.Image.Image"
+                    )
 
                 content.append(item)
-        messages.append({
-            "role": "user",
-            "content": content
-        })
+        messages.append({"role": "user", "content": content})
 
     return messages
 
 
 def test_convert_gradio_to_openai_format():
     history1 = [
-        ['text1', '[91 24 10 19 73]'],
-        ['text2', '[85 98 95  3 25]'],
-        ['text3', '[58 60 35 97 39]'],
+        ["text1", "[91 24 10 19 73]"],
+        ["text2", "[85 98 95  3 25]"],
+        ["text3", "[58 60 35 97 39]"],
     ]
-    query = 'text4'
+    query = "text4"
     messages1 = convert_gradio_to_openai_format(history1, query)
     print(messages1)
     print("\n")
     [
-        {'role': 'user', 'content': 'text1'},
-        {'role': 'assistant', 'content': '[91 24 10 19 73]'},
-        {'role': 'user', 'content': 'text2'},
-        {'role': 'assistant', 'content': '[85 98 95  3 25]'},
-        {'role': 'user', 'content': 'text3'},
-        {'role': 'assistant', 'content': '[58 60 35 97 39]'},
-        {'role': 'user', 'content': 'text4'}
+        {"role": "user", "content": "text1"},
+        {"role": "assistant", "content": "[91 24 10 19 73]"},
+        {"role": "user", "content": "text2"},
+        {"role": "assistant", "content": "[85 98 95  3 25]"},
+        {"role": "user", "content": "text3"},
+        {"role": "assistant", "content": "[58 60 35 97 39]"},
+        {"role": "user", "content": "text4"},
     ]
-
 
     history2 = [
-        ['你是谁', '[47  5 79  7 79]'],
-        [('what is this?', Image.open('../images/logo.png')), '[58 71 49 87 10]'],
-        [('这2张图片展示的什么内容?', [Image.open('../images/openxlab.png'), Image.open('../images/openxlab_model.jpg')]), '[29 86 41 26 84]'],
+        ["你是谁", "[47  5 79  7 79]"],
+        [("what is this?", Image.open("../images/logo.png")), "[58 71 49 87 10]"],
+        [
+            (
+                "这2张图片展示的什么内容?",
+                [
+                    Image.open("../images/openxlab.png"),
+                    Image.open("../images/openxlab_model.jpg"),
+                ],
+            ),
+            "[29 86 41 26 84]",
+        ],
     ]
-    query = ('how dare you!', Image.open('../images/openxlab.png'))
+    query = ("how dare you!", Image.open("../images/openxlab.png"))
 
     messages2 = convert_gradio_to_openai_format(history2, query)
     print(messages2)
     [
-        {'role': 'user', 'content': '你是谁'},
-        {'role': 'assistant', 'content': '[47  5 79  7 79]'},
-        {'role': 'user', 'content': [
-            {'type': 'text', 'text': 'what is this?'},
-            {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1792x871 at 0x20EF90509D0>'}}]
+        {"role": "user", "content": "你是谁"},
+        {"role": "assistant", "content": "[47  5 79  7 79]"},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "what is this?"},
+                {
+                    "type": "image_data",
+                    "image_data": {
+                        "data": "<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1792x871 at 0x20EF90509D0>"
+                    },
+                },
+            ],
         },
-        {'role': 'assistant', 'content': '[58 71 49 87 10]'},
-        {'role': 'user', 'content': [
-            {'type': 'text', 'text': '这2张图片展示的什么内容?'},
-            {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x20EF90C62D0>'}},
-            {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x20EF90C64D0>'}}]
+        {"role": "assistant", "content": "[58 71 49 87 10]"},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "这2张图片展示的什么内容?"},
+                {
+                    "type": "image_data",
+                    "image_data": {
+                        "data": "<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x20EF90C62D0>"
+                    },
+                },
+                {
+                    "type": "image_data",
+                    "image_data": {
+                        "data": "<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x20EF90C64D0>"
+                    },
+                },
+            ],
         },
-        {'role': 'assistant', 'content': '[29 86 41 26 84]'},
-        {'role': 'user', 'content': [
-            {'type': 'text', 'text': 'how dare you!'},
-            {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x20EF90C6990>'}}]
-        }
+        {"role": "assistant", "content": "[29 86 41 26 84]"},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "how dare you!"},
+                {
+                    "type": "image_data",
+                    "image_data": {
+                        "data": "<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x20EF90C6990>"
+                    },
+                },
+            ],
+        },
     ]
 
 
@@ -317,101 +355,87 @@ def convert_gradio_to_openai_format_new(
     messages = []
     for prompt, response in history:
         if isinstance(prompt, str):
-            content = prompt # 兼容不支持列表格式的模型
+            content = prompt  # 兼容不支持列表格式的模型
             # content = [{
             #     'type': 'text',
             #     'text': prompt,
             # }]
         else:
-            content = [{
-                'type': 'text',
-                'text': f'',  # text占位符
-            }]
+            content = [
+                {
+                    "type": "text",
+                    "text": f"",  # text占位符
+                }
+            ]
             image = prompt[0]
             # 'image_url': means url or local path to image.
             # 'image_data': means PIL.Image.Image object.
             if isinstance(image, str):
                 image_base64_data = encode_image_base64(image)
-                if image_base64_data == '':
-                    logger.error(f'failed to load file {image}')
-                    raise ValueError(f'failed to load file {image}')
+                if image_base64_data == "":
+                    logger.error(f"failed to load file {image}")
+                    raise ValueError(f"failed to load file {image}")
                 item = {
-                    'type': 'image_url',
-                    'image_url': {
-                        'url':
-                        f'data:image/jpeg;base64,{image_base64_data}'
-                    }
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{image_base64_data}"},
                 }
             elif isinstance(image, Image.Image):
-                item = {
-                    'type': 'image_data',
-                    'image_data': {
-                        'data': image
-                    }
-                }
+                item = {"type": "image_data", "image_data": {"data": image}}
             else:
-                raise ValueError(
-                    'image should be a str(url/path) or PIL.Image.Image')
+                raise ValueError("image should be a str(url/path) or PIL.Image.Image")
 
             content.append(item)
 
-        messages.append({
-            "role": "user",
-            "content": content
-        })
+        messages.append({"role": "user", "content": content})
 
         if response is not None:
-            messages.append({
-                "role": "assistant",
-                # assistant 的回答必须是字符串,不能是数组
-                "content": response
-            })
+            messages.append(
+                {
+                    "role": "assistant",
+                    # assistant 的回答必须是字符串,不能是数组
+                    "content": response,
+                }
+            )
 
     # 添加当前的query
     if query is not None:
         if isinstance(query, str):
-            content = query # 兼容不支持列表格式的模型
+            content = query  # 兼容不支持列表格式的模型
             # content = [{
             #     'type': 'text',
             #     'text': query,
             # }]
         else:
-            query_text, images = query['text'], query['files']
-            content = [{
-                'type': 'text',
-                'text': f'{query_text}',
-            }]
+            query_text, images = query["text"], query["files"]
+            content = [
+                {
+                    "type": "text",
+                    "text": f"{query_text}",
+                }
+            ]
             for image in images:
                 # 'image_url': means url or local path to image.
                 # 'image_data': means PIL.Image.Image object.
                 if isinstance(image, str):
                     image_base64_data = encode_image_base64(image)
-                    if image_base64_data == '':
-                        logger.error(f'failed to load file {image}')
+                    if image_base64_data == "":
+                        logger.error(f"failed to load file {image}")
                         continue
                     item = {
-                        'type': 'image_url',
-                        'image_url': {
-                            'url':
-                            f'data:image/jpeg;base64,{image_base64_data}'
-                        }
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_base64_data}"
+                        },
                     }
                 elif isinstance(image, Image.Image):
-                    item = {
-                        'type': 'image_data',
-                        'image_data': {
-                            'data': image
-                        }
-                    }
+                    item = {"type": "image_data", "image_data": {"data": image}}
                 else:
                     raise ValueError(
-                        'image should be a str(url/path) or PIL.Image.Image')
+                        "image should be a str(url/path) or PIL.Image.Image"
+                    )
 
                 content.append(item)
-        messages.append({
-            "role": "user",
-            "content": content
-        })
+        messages.append({"role": "user", "content": content})
 
     return messages
 
@@ -447,7 +471,7 @@ def convert_openai_to_gradio_format(
     if len(messages) == 0:
         return "", None
     if len(messages) >= 0:
-        if messages[0]['role'] == 'system':
+        if messages[0]["role"] == "system":
             messages.pop(0)
         if len(messages) == 0:
             return "", None
@@ -455,7 +479,7 @@ def convert_openai_to_gradio_format(
         # 获取查询语句
         if len(messages) % 2 != 0:
             # 单数,代表最后一句是查询语句
-            query: str = messages.pop(-1)['content']
+            query: str = messages.pop(-1)["content"]
         else:
             # 偶数,代表最后一句是回复语句
             query = ""
@@ -463,7 +487,7 @@ def convert_openai_to_gradio_format(
         # 获取历史
         history = []
         for i in range(0, len(messages), 2):
-            history.append((messages[i]['content'], messages[i+1]['content']))
+            history.append((messages[i]["content"], messages[i + 1]["content"]))
 
         return query, history
 
@@ -478,7 +502,10 @@ def test_convert_openai_to_gradio_format():
     # history= None
 
     messages = [
-        {"role": "system", "content": "You are a helpful, respectful and honest assistant."}
+        {
+            "role": "system",
+            "content": "You are a helpful, respectful and honest assistant.",
+        }
     ]
     query, history = convert_openai_to_gradio_format(messages)
     print(f"{query = }")
@@ -488,8 +515,11 @@ def test_convert_openai_to_gradio_format():
     # history= None
 
     messages = [
-        {"role": "system", "content": "You are a helpful, respectful and honest assistant."},
-        {'role': 'user', 'content': 'What is the capital of France?'},
+        {
+            "role": "system",
+            "content": "You are a helpful, respectful and honest assistant.",
+        },
+        {"role": "user", "content": "What is the capital of France?"},
     ]
     query, history = convert_openai_to_gradio_format(messages)
     print(f"{query = }")
@@ -499,8 +529,8 @@ def test_convert_openai_to_gradio_format():
     # history= []
 
     messages = [
-        {'role': 'user', 'content': 'What is the capital of France?'},
-        {'role': 'assistant', 'content': 'The capital of France is Paris.'},
+        {"role": "user", "content": "What is the capital of France?"},
+        {"role": "assistant", "content": "The capital of France is Paris."},
     ]
     query, history = convert_openai_to_gradio_format(messages)
     print(f"{query = }")
@@ -510,11 +540,11 @@ def test_convert_openai_to_gradio_format():
     # history= [('What is the capital of France?', 'The capital of France is Paris.')]
 
     messages = [
-        {'role': 'user', 'content': 'What is the capital of France?'},
-        {'role': 'assistant', 'content': 'The capital of France is Paris.'},
-        {'role': 'user', 'content': 'What is in the image?'},
-        {'role': 'assistant', 'content': 'There is a dog in the image.'},
-        {'role': 'user', 'content': 'How dare you!'},
+        {"role": "user", "content": "What is the capital of France?"},
+        {"role": "assistant", "content": "The capital of France is Paris."},
+        {"role": "user", "content": "What is in the image?"},
+        {"role": "assistant", "content": "There is a dog in the image."},
+        {"role": "user", "content": "How dare you!"},
     ]
     query, history = convert_openai_to_gradio_format(messages)
     print(f"{query = }")
@@ -524,12 +554,15 @@ def test_convert_openai_to_gradio_format():
     # history= [('What is the capital of France?', 'The capital of France is Paris.'), ('What is in the image?', 'There is a dog in the image.')]
 
     messages = [
-        {"role": "system", "content": "You are a helpful, respectful and honest assistant."},
-        {'role': 'user', 'content': 'What is the capital of France?'},
-        {'role': 'assistant', 'content': 'The capital of France is Paris.'},
-        {'role': 'user', 'content': 'What is in the image?'},
-        {'role': 'assistant', 'content': 'There is a dog in the image.'},
-        {'role': 'user', 'content': 'How dare you!'},
+        {
+            "role": "system",
+            "content": "You are a helpful, respectful and honest assistant.",
+        },
+        {"role": "user", "content": "What is the capital of France?"},
+        {"role": "assistant", "content": "The capital of France is Paris."},
+        {"role": "user", "content": "What is in the image?"},
+        {"role": "assistant", "content": "There is a dog in the image."},
+        {"role": "user", "content": "How dare you!"},
     ]
     query, history = convert_openai_to_gradio_format(messages)
     print(f"{query = }")
@@ -541,58 +574,109 @@ def test_convert_openai_to_gradio_format():
 
 def test_convert_gradio_to_openai_format_new():
     history1 = [
-        ['text1', '[91 24 10 19 73]'],
-        ['text2', '[85 98 95  3 25]'],
-        ['text3', '[58 60 35 97 39]'],
+        ["text1", "[91 24 10 19 73]"],
+        ["text2", "[85 98 95  3 25]"],
+        ["text3", "[58 60 35 97 39]"],
     ]
-    query = 'text4'
+    query = "text4"
     messages1 = convert_gradio_to_openai_format_new(history1, query)
     print(messages1)
     print("\n")
     [
-        {'role': 'user', 'content': 'text1'},
-        {'role': 'assistant', 'content': '[91 24 10 19 73]'},
-        {'role': 'user', 'content': 'text2'},
-        {'role': 'assistant', 'content': '[85 98 95  3 25]'},
-        {'role': 'user', 'content': 'text3'},
-        {'role': 'assistant', 'content': '[58 60 35 97 39]'},
-        {'role': 'user', 'content': 'text4'}
+        {"role": "user", "content": "text1"},
+        {"role": "assistant", "content": "[91 24 10 19 73]"},
+        {"role": "user", "content": "text2"},
+        {"role": "assistant", "content": "[85 98 95  3 25]"},
+        {"role": "user", "content": "text3"},
+        {"role": "assistant", "content": "[58 60 35 97 39]"},
+        {"role": "user", "content": "text4"},
     ]
-
 
     history2 = [
-        ['你是谁', '[47  5 79  7 79]'],
-        [(Image.open('../images/logo.png'), None), None],
-        ['what is this?', '[58 71 49 87 10]'],
-        [(Image.open('../images/openxlab.png'), None), None],
-        [(Image.open('../images/openxlab_model.jpg'), None), None],
-        ['这2张图片展示的什么内容?', '[29 86 41 26 84]'],
+        ["你是谁", "[47  5 79  7 79]"],
+        [(Image.open("../images/logo.png"), None), None],
+        ["what is this?", "[58 71 49 87 10]"],
+        [(Image.open("../images/openxlab.png"), None), None],
+        [(Image.open("../images/openxlab_model.jpg"), None), None],
+        ["这2张图片展示的什么内容?", "[29 86 41 26 84]"],
     ]
     query = {
-        'text': 'how dare you!',
-        'files': [
-            Image.open('../images/openxlab.png'),
-            Image.open('../images/openxlab_model.jpg')
-        ]
+        "text": "how dare you!",
+        "files": [
+            Image.open("../images/openxlab.png"),
+            Image.open("../images/openxlab_model.jpg"),
+        ],
     }
 
     messages2 = convert_gradio_to_openai_format_new(history2, query)
     print(messages2)
     [
-        {'role': 'user', 'content': '你是谁'},
-        {'role': 'assistant', 'content': '[47  5 79  7 79]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1792x871 at 0x1B5C064FF90>'}}]},
-        {'role': 'user', 'content': 'what is this?'},
-        {'role': 'assistant', 'content': '[58 71 49 87 10]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x1B5C06C59D0>'}}]},
-        {'role': 'user', 'content': [{'type': 'text', 'text': ''}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x1B5C06C5C10>'}}]},
-        {'role': 'user', 'content': '这2张图片展示的什么内容?'},
-        {'role': 'assistant', 'content': '[29 86 41 26 84]'},
-        {'role': 'user', 'content': [{'type': 'text', 'text': 'how dare you!'}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x1B5C06C60D0>'}}, {'type': 'image_data', 'image_data': {'data': '<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x1B5C06C6350>'}}]}
+        {"role": "user", "content": "你是谁"},
+        {"role": "assistant", "content": "[47  5 79  7 79]"},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": ""},
+                {
+                    "type": "image_data",
+                    "image_data": {
+                        "data": "<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1792x871 at 0x1B5C064FF90>"
+                    },
+                },
+            ],
+        },
+        {"role": "user", "content": "what is this?"},
+        {"role": "assistant", "content": "[58 71 49 87 10]"},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": ""},
+                {
+                    "type": "image_data",
+                    "image_data": {
+                        "data": "<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x1B5C06C59D0>"
+                    },
+                },
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": ""},
+                {
+                    "type": "image_data",
+                    "image_data": {
+                        "data": "<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x1B5C06C5C10>"
+                    },
+                },
+            ],
+        },
+        {"role": "user", "content": "这2张图片展示的什么内容?"},
+        {"role": "assistant", "content": "[29 86 41 26 84]"},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "how dare you!"},
+                {
+                    "type": "image_data",
+                    "image_data": {
+                        "data": "<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1580x1119 at 0x1B5C06C60D0>"
+                    },
+                },
+                {
+                    "type": "image_data",
+                    "image_data": {
+                        "data": "<PIL.PngImagePlugin.PngImageFile image mode=RGBA size=1019x716 at 0x1B5C06C6350>"
+                    },
+                },
+            ],
+        },
     ]
 
 
-def convert_to_multimodal_history(original_history: list, use_pil: bool = False) -> list:
+def convert_to_multimodal_history(
+    original_history: list, use_pil: bool = False
+) -> list:
     transformed_history = []
     temp_image_list = []
     for query, answer in original_history:
@@ -620,42 +704,54 @@ def convert_to_multimodal_history(original_history: list, use_pil: bool = False)
 def test_convert_to_multimodal_history():
     # 原始列表
     original = [
-        ['你是谁', '我是你的小助手。'],
-        [('./images/0001.jpg',), None],
-        ['', '这张图片中有一只猫。'],
-        [('./images/0002.jpg',), None],
-        ['这张图片展示的什么内容?', '这张图片中也有一只猫。'],
-        [('./images/0003.jpg',), None],
-        [('./images/0004.jpg',), None],
-        ['这2张图片展示的什么内容?', '第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。'],
-        [('./images/0005.jpg',), None],
-        [('./images/0006.jpg',), None],
-        ['', '这两张图片显示了雪山上的景色。']
+        ["你是谁", "我是你的小助手。"],
+        [("./images/0001.jpg",), None],
+        ["", "这张图片中有一只猫。"],
+        [("./images/0002.jpg",), None],
+        ["这张图片展示的什么内容?", "这张图片中也有一只猫。"],
+        [("./images/0003.jpg",), None],
+        [("./images/0004.jpg",), None],
+        [
+            "这2张图片展示的什么内容?",
+            "第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。",
+        ],
+        [("./images/0005.jpg",), None],
+        [("./images/0006.jpg",), None],
+        ["", "这两张图片显示了雪山上的景色。"],
     ]
 
     # 转换列表
     transformed = convert_to_multimodal_history(original)
     print(transformed)
     [
-        ['你是谁', '我是你的小助手。'],
-        [('', ['./images/0001.jpg']), '这张图片中有一只猫。'],
-        [('这张图片展示的什么内容?', ['./images/0002.jpg']), '这张图片中也有一只猫。'],
-        [('这2张图片展示的什么内容?', ['./images/0003.jpg', './images/0004.jpg']), '第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。'],
-        [('', ['./images/0005.jpg', './images/0006.jpg']), '这两张图片显示了雪山上的景色。']
+        ["你是谁", "我是你的小助手。"],
+        [("", ["./images/0001.jpg"]), "这张图片中有一只猫。"],
+        [("这张图片展示的什么内容?", ["./images/0002.jpg"]), "这张图片中也有一只猫。"],
+        [
+            ("这2张图片展示的什么内容?", ["./images/0003.jpg", "./images/0004.jpg"]),
+            "第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。",
+        ],
+        [
+            ("", ["./images/0005.jpg", "./images/0006.jpg"]),
+            "这两张图片显示了雪山上的景色。",
+        ],
     ]
 
     transformed = convert_to_multimodal_history(original[:-1])
     print(transformed)
     [
-        ['你是谁', '我是你的小助手。'],
-        [('', ['./images/0001.jpg']), '这张图片中有一只猫。'],
-        [('这张图片展示的什么内容?', ['./images/0002.jpg']), '这张图片中也有一只猫。'],
-        [('这2张图片展示的什么内容?', ['./images/0003.jpg', './images/0004.jpg']), '第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。'],
-        [('', ['./images/0005.jpg', './images/0006.jpg']), '']
+        ["你是谁", "我是你的小助手。"],
+        [("", ["./images/0001.jpg"]), "这张图片中有一只猫。"],
+        [("这张图片展示的什么内容?", ["./images/0002.jpg"]), "这张图片中也有一只猫。"],
+        [
+            ("这2张图片展示的什么内容?", ["./images/0003.jpg", "./images/0004.jpg"]),
+            "第一张图片中有一个人在滑雪，第二张图片中有一个人坐在长椅上休息。",
+        ],
+        [("", ["./images/0005.jpg", "./images/0006.jpg"]), ""],
     ]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_convert_gradio_to_openai_format()
     print("*" * 100)
     test_convert_gradio_to_openai_format_new()

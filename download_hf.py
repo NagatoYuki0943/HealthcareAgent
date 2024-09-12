@@ -24,27 +24,27 @@ MODEL_PATH = "./models/internlm2_5-1_8b-chat"
 
 
 snapshot_download(
-    repo_id = "maidalun1020/bce-embedding-base_v1",
-    local_dir = EMBEDDING_MODEL_PATH,
-    # proxies = proxies,
-    max_workers = 8,
-    # endpoint = endpoint,
-    token = hf_token
+    repo_id="maidalun1020/bce-embedding-base_v1",
+    local_dir=EMBEDDING_MODEL_PATH,
+    # proxies=proxies,
+    max_workers=8,
+    # endpoint=endpoint,
+    token=hf_token,
 )
 
 snapshot_download(
-    repo_id = "maidalun1020/bce-reranker-base_v1",
-    local_dir = RERANKER_MODEL_PATH,
-    # proxies = proxies,
-    max_workers = 8,
-    # endpoint = endpoint,
-    token = hf_token
+    repo_id="maidalun1020/bce-reranker-base_v1",
+    local_dir=RERANKER_MODEL_PATH,
+    # proxies=proxies,
+    max_workers=8,
+    # endpoint=endpoint,
+    token=hf_token,
 )
 
 snapshot_download(
-    repo_id = "internlm/internlm2_5-1_8b-chat",
-    local_dir = MODEL_PATH,
-    # proxies = proxies,
-    max_workers = 8,
-    # endpoint = endpoint,
+    repo_id="internlm/internlm2_5-1_8b-chat",
+    local_dir=MODEL_PATH,
+    # proxies=proxies,
+    max_workers=8,
+    # endpoint=endpoint,
 )

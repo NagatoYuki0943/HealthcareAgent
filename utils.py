@@ -57,24 +57,24 @@ def remove_history_references(history: list) -> list:
 
 
 def download_openxlab_dataset(
-    dataset_repo: str = 'NagatoYuki0943/FMdocs',
-    target_path: str = './data/',
+    dataset_repo: str = "NagatoYuki0943/FMdocs",
+    target_path: str = "./data/",
     access_key: str | None = None,
-    secret_key: str | None = None
+    secret_key: str | None = None,
 ):
     import openxlab
     from openxlab.dataset import get
 
     print("start download dataset")
     openxlab.login(ak=access_key, sk=secret_key, relogin=True)
-    get(dataset_repo=dataset_repo, target_path=target_path) # 数据集下载
+    get(dataset_repo=dataset_repo, target_path=target_path)  # 数据集下载
     print("finish download dataset")
 
 
 # write by codeium
 def hashfile(file: str):
     sha256 = hashlib.sha256()
-    with open(file, 'rb') as f:
+    with open(file, "rb") as f:
         while True:
             data = f.read(1024)
             if not data:

@@ -9,7 +9,9 @@ import os
 from tencentcloud.common import credential
 from tencentcloud.common.profile.client_profile import ClientProfile
 from tencentcloud.common.profile.http_profile import HttpProfile
-from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import (
+    TencentCloudSDKException,
+)
 from tencentcloud.ocr.v20181119 import ocr_client, models
 
 
@@ -32,9 +34,7 @@ def get_file_content_as_base64(path, urlencoded=False):
 
 
 def ocr_detection(img, secret_id, secret_key):
-
     try:
-
         cred = credential.Credential(secret_id, secret_key)
         # 实例化一个http选项，可选的，没有特殊需求可以跳过
         httpProfile = HttpProfile()
@@ -64,11 +64,15 @@ def ocr_detection(img, secret_id, secret_key):
         colIndex = []
         content = []
 
-        for data_tabled in data_json['TableDetections']:
-            for item in data_tabled['Cells']:
-                rowIndex.append(item['RowTl'])
-                colIndex.append(item['ColTl'])
-                content.append(item['Text'] if '~' not in item['Text'] else item['Text'].replace("~", '-'))
+        for data_tabled in data_json["TableDetections"]:
+            for item in data_tabled["Cells"]:
+                rowIndex.append(item["RowTl"])
+                colIndex.append(item["ColTl"])
+                content.append(
+                    item["Text"]
+                    if "~" not in item["Text"]
+                    else item["Text"].replace("~", "-")
+                )
 
         return str(content)
 
@@ -82,7 +86,11 @@ def get_ernie_access_token(ernie_api_key, ernie_secret_key):
     :return: access_token，或是None(如果错误)
     """
     url = "https://aip.baidubce.com/oauth/2.0/token"
-    params = {"grant_type": "client_credentials", "client_id": ernie_api_key, "client_secret": ernie_secret_key}
+    params = {
+        "grant_type": "client_credentials",
+        "client_id": ernie_api_key,
+        "client_secret": ernie_secret_key,
+    }
     return str(requests.post(url, params=params).json().get("access_token"))
 
 
