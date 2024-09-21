@@ -1,4 +1,5 @@
 import os
+from packaging import version
 import torch
 from langchain_core.documents import Document
 from langchain_community.document_loaders import (
@@ -9,10 +10,12 @@ from langchain_community.document_loaders import (
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chinese_recursive_text_splitter import ChineseRecursiveTextSplitter
+import langchain_core
 from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_community.embeddings import HuggingFaceEmbeddings
-
-# from langchain_huggingface import HuggingFaceEmbeddings
+if version.parse(langchain_core.__version__) < version.parse("0.2"):
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+else:
+    from langchain_huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 from loguru import logger
 from typing import Literal
