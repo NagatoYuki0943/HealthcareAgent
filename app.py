@@ -8,11 +8,9 @@ import os
 import gradio as gr
 from typing import Generator, Sequence
 import threading
-import cv2
 import json
 import requests
 from loguru import logger
-from shutil import rmtree
 from modelscope import snapshot_download
 
 from vector_database import VectorDatabase
@@ -173,8 +171,8 @@ def chat(
 
     # 是否是有效的问题
     query = query.strip()
-    if query == None or len(query) < 1:
-        logger.warning(f"query is None, return history")
+    if query is None or len(query) < 1:
+        logger.warning("query is None, return history")
         yield history
         return
     logger.info(f"query: {query}")
@@ -240,7 +238,7 @@ def regenerate(
             session_id=session_id,
         )
     else:
-        logger.warning(f"no history, can't regenerate")
+        logger.warning("no history, can't regenerate")
         yield history
 
 
@@ -258,7 +256,7 @@ def ocr_chat(img, query, history: list, current_img: str):
     logger.info(f"{current_img = }")
 
     # 有图片且图片不是之前的图片才使用ocr
-    if img != None and img != current_img:
+    if img is not None and img != current_img:
         logger.warning(f"use ocr")
         ocr_result: str = ocr_detection(img, ocr_secret_id, ocr_secret_key)
         txt = f"图片ocr检测结果:\n<ocr>\n{ocr_result}\n</ocr>\n question: {query}"
@@ -278,7 +276,7 @@ def ocr_chat(img, query, history: list, current_img: str):
     payload = json.dumps({"messages": prompts})
     headers = {"Content-Type": "application/json"}
 
-    if query == None and img == None:
+    if query is None and img is None:
         return "", history, current_img
     try:
         res = requests.request("POST", url, headers=headers, data=payload).json()

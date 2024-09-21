@@ -99,7 +99,7 @@ def get_ernie_access_token(ernie_api_key, ernie_secret_key):
 #     print(f"{current_img = }")
 
 #     # 有图片且图片不是之前的图片才使用ocr
-#     if img != None and img != current_img:
+#     if img is not None and img != current_img:
 #         print(f"use ocr")
 #         ocr_result: str = ocr_detection(img, ocr_secret_id, ocr_secret_key)
 #         txt = f"图片ocr检测结果:\n<ocr>\n{ocr_result}\n</ocr>\n question: {query}"
@@ -119,7 +119,7 @@ def get_ernie_access_token(ernie_api_key, ernie_secret_key):
 #         'Content-Type': 'application/json'
 #     }
 
-#     if query == None and img == None:
+#     if query is None and img is None:
 #         return "", history, current_img
 #     try:
 #         res = requests.request("POST", url, headers=headers, data=payload).json()

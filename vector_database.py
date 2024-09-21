@@ -12,6 +12,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chinese_recursive_text_splitter import ChineseRecursiveTextSplitter
 import langchain_core
 from langchain_core.vectorstores import VectorStoreRetriever
+
 if version.parse(langchain_core.__version__) < version.parse("0.2"):
     from langchain_community.embeddings import HuggingFaceEmbeddings
 else:

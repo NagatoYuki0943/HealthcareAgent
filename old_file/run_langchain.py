@@ -27,7 +27,7 @@ class ModelCenter:
         调用不带历史记录的问答链进行回答
         """
 
-        if query == None or len(query) < 1:
+        if query is None or len(query) < 1:
             return history
         try:
             # invoke(input: Dict[str, Any], config: Optional[langchain_core.runnables.config.RunnableConfig] = None, **kwargs: Any) -> Dict[str, Any]
@@ -48,7 +48,7 @@ class ModelCenter:
         调用不带历史记录的问答链进行回答
         """
         query = query.strip()
-        if query == None or len(query) < 1:
+        if query is None or len(query) < 1:
             ...
             # yield history
         try:
@@ -67,7 +67,7 @@ model_center = ModelCenter()
 
 while True:
     query = input("请输入提示:")
-    if query == None or len(query) < 1:
+    if query is None or len(query) < 1:
         continue
     if query.lower() == "exit":
         break

@@ -25,7 +25,7 @@ class ModelCenter:
 
         history: [['What is the capital of France?', 'The capital of France is Paris.'], ['Thanks', 'You are Welcome']]
         """
-        if query == None or len(query) < 1:
+        if query is None or len(query) < 1:
             return history
         try:
             # invoke(input: Dict[str, Any], config: Optional[langchain_core.runnables.config.RunnableConfig] = None, **kwargs: Any) -> Dict[str, Any]
