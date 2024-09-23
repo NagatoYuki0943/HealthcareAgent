@@ -1,4 +1,5 @@
 import os
+from packaging import version
 import torch
 from langchain_core.documents import Document
 from langchain_community.document_loaders import (
@@ -9,9 +10,13 @@ from langchain_community.document_loaders import (
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chinese_recursive_text_splitter import ChineseRecursiveTextSplitter
+import langchain_core
 from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_community.embeddings import HuggingFaceEmbeddings
-# from langchain_huggingface import HuggingFaceEmbeddings
+
+if version.parse(langchain_core.__version__) < version.parse("0.2"):
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+else:
+    from langchain_huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 from loguru import logger
 from typing import Literal
@@ -23,14 +28,16 @@ class VectorDatabase:
         self,
         data_path: str = "./data",
         embedding_model_path: str = "./models/bce-embedding-base_v1",
-        reranker_model_path : str | None = "./models/bce-reranker-base_v1",
+        reranker_model_path: str | None = "./models/bce-reranker-base_v1",
         persist_directory: str = "./vector_db/faiss",
         similarity_top_k: int = 4,
         similarity_fetch_k: int = 20,
         score_threshold: float = 0.15,
         allow_suffix: tuple[str] | str = (".txt", ".md", ".docx", ".doc", ".pdf"),
-        device: str = 'cuda',
-        text_splitter_type: Literal['RecursiveCharacterTextSplitter', 'ChineseRecursiveTextSplitter'] = 'RecursiveCharacterTextSplitter',
+        device: str = "cuda",
+        text_splitter_type: Literal[
+            "RecursiveCharacterTextSplitter", "ChineseRecursiveTextSplitter"
+        ] = "RecursiveCharacterTextSplitter",
     ) -> None:
         """
         Args:
@@ -53,21 +60,19 @@ class VectorDatabase:
         self.score_threshold = score_threshold
         self.allow_suffix = allow_suffix
         self.device = device
-        if text_splitter_type == 'RecursiveCharacterTextSplitter':
+        if text_splitter_type == "RecursiveCharacterTextSplitter":
             self.text_splitter = RecursiveCharacterTextSplitter
-        elif text_splitter_type == 'ChineseRecursiveTextSplitter':
+        elif text_splitter_type == "ChineseRecursiveTextSplitter":
             self.text_splitter = ChineseRecursiveTextSplitter
         logger.info(f"text_splitter: {self.text_splitter}")
 
         # 加载开源词向量模型
         self.embeddings = HuggingFaceEmbeddings(
-            model_name = embedding_model_path,
-            model_kwargs = {'device': self.device},
-            encode_kwargs = {
-                'normalize_embeddings': True
-            }
+            model_name=embedding_model_path,
+            model_kwargs={"device": self.device},
+            encode_kwargs={"normalize_embeddings": True},
         )
-        if 'cuda' in self.device:
+        if "cuda" in self.device:
             self.embeddings.client = self.embeddings.client.half()
         self.retriever = None
         # 清除未使用缓存
@@ -134,7 +139,9 @@ class VectorDatabase:
             docs.extend(loader.load())
 
         if len(repeated_files) > 0:
-            logger.warning(f"repeated_files: {', '.join(repeated_files)}, please delete them.")
+            logger.warning(
+                f"repeated_files: {', '.join(repeated_files)}, please delete them."
+            )
         return docs
 
     def create_faiss_vectordb(self, force: bool = False) -> None:
@@ -145,13 +152,18 @@ class VectorDatabase:
         """
         if os.path.exists(self.persist_directory):
             if not force:
-                logger.warning(f"`{self.persist_directory}` 路径已存在, 无需创建数据库, 直接读取数据库即可, 如果想强制重新传建, 请设置参数 `force = True`")
+                logger.warning(
+                    f"`{self.persist_directory}` 路径已存在, 无需创建数据库, 直接读取数据库即可, 如果想强制重新传建, 请设置参数 `force = True`"
+                )
                 self.load_faiss_vectordb()
                 return
             else:
                 from shutil import rmtree
+
                 rmtree(self.persist_directory)
-                logger.warning(f"\033[0;31;40m`{self.persist_directory}` 路径已删除,即将重新创建数据库\033[0m")
+                logger.warning(
+                    f"\033[0;31;40m`{self.persist_directory}` 路径已删除,即将重新创建数据库\033[0m"
+                )
 
         from langchain_community.vectorstores import FAISS
 
@@ -161,20 +173,17 @@ class VectorDatabase:
         docs = self.get_text(file_list)
 
         # 对文本进行分块
-        text_splitter = self.text_splitter(
-            chunk_size = 512,
-            chunk_overlap = 32
-        )
+        text_splitter = self.text_splitter(chunk_size=512, chunk_overlap=32)
         split_docs = text_splitter.split_documents(docs)
 
         # 构建向量数据库
         self.vectordb = FAISS.from_documents(
-            documents = split_docs,
-            embedding = self.embeddings,
+            documents=split_docs,
+            embedding=self.embeddings,
         )
 
         # 将加载的向量数据库持久化到磁盘上
-        self.vectordb.save_local(folder_path = self.persist_directory)
+        self.vectordb.save_local(folder_path=self.persist_directory)
         # 清除未使用缓存
         torch.cuda.empty_cache()
         logger.info("成功建立数据库")
@@ -186,12 +195,12 @@ class VectorDatabase:
 
         # 加载数据库
         self.vectordb = FAISS.load_local(
-            folder_path = self.persist_directory,
-            embeddings = self.embeddings,
-            allow_dangerous_deserialization = True, # 允许读取pickle
+            folder_path=self.persist_directory,
+            embeddings=self.embeddings,
+            allow_dangerous_deserialization=True,  # 允许读取pickle
             # faiss 仅支持 EUCLIDEAN_DISTANCE MAX_INNER_PRODUCT COSINE
-            distance_strategy = DistanceStrategy.MAX_INNER_PRODUCT,  # refer: https://github.com/InternLM/HuixiangDou/blob/main/huixiangdou/service/retriever.py
-            normalize_L2 = False
+            distance_strategy=DistanceStrategy.MAX_INNER_PRODUCT,  # refer: https://github.com/InternLM/HuixiangDou/blob/main/huixiangdou/service/retriever.py
+            normalize_L2=False,
         )
         # 清除未使用缓存
         torch.cuda.empty_cache()
@@ -201,12 +210,12 @@ class VectorDatabase:
         """创建 Retriever"""
         # search_type: 'similarity', 'similarity_score_threshold', 'mmr'
         self.retriever: VectorStoreRetriever = self.vectordb.as_retriever(
-            search_type = "similarity_score_threshold",
-            search_kwargs = {
+            search_type="similarity_score_threshold",
+            search_kwargs={
                 "k": self.similarity_top_k,
                 "score_threshold": self.score_threshold,
-                "fetch_k": self.similarity_fetch_k
-            }
+                "fetch_k": self.similarity_fetch_k,
+            },
         )
         # 清除未使用缓存
         torch.cuda.empty_cache()
@@ -214,33 +223,34 @@ class VectorDatabase:
 
     def create_faiss_reranker_retriever(self) -> None:
         """创建重排序 Retriever"""
-        assert self.reranker_model_path is not None, "使用 reranker 必须指定 `reranker_model_path`"
+        assert (
+            self.reranker_model_path is not None
+        ), "使用 reranker 必须指定 `reranker_model_path`"
 
         from BCEmbedding.tools.langchain import BCERerank
         from langchain.retrievers import ContextualCompressionRetriever
 
         # search_type: 'similarity', 'similarity_score_threshold', 'mmr'
         retriever: VectorStoreRetriever = self.vectordb.as_retriever(
-            search_type = "similarity_score_threshold",
-            search_kwargs = {
+            search_type="similarity_score_threshold",
+            search_kwargs={
                 "k": self.similarity_fetch_k,
                 "score_threshold": self.score_threshold,
-            }
+            },
         )
 
         # 载入reranker模型
         reranker = BCERerank(
-            top_n = self.similarity_top_k,
-            model = self.reranker_model_path,
-            device = self.device,
-            use_fp16 = True if 'cuda' in self.device else False
+            top_n=self.similarity_top_k,
+            model=self.reranker_model_path,
+            device=self.device,
+            use_fp16=True if "cuda" in self.device else False,
         )
         logger.info(f"reranker: {reranker}")
 
         # 创建检索器
         self.retriever = ContextualCompressionRetriever(
-            base_compressor = reranker,
-            base_retriever = retriever
+            base_compressor=reranker, base_retriever=retriever
         )
         # 清除未使用缓存
         torch.cuda.empty_cache()
@@ -250,7 +260,9 @@ class VectorDatabase:
         self,
         query: str,
     ) -> tuple[str, str]:
-        assert self.retriever is not None, "请先调用 `create_faiss_retriever` 或者 `create_faiss_reranker_retriever` 创建检索器"
+        assert (
+            self.retriever is not None
+        ), "请先调用 `create_faiss_retriever` 或者 `create_faiss_reranker_retriever` 创建检索器"
 
         # similarity search
         documents: list[Document] = self.retriever.invoke(query)
@@ -258,7 +270,9 @@ class VectorDatabase:
         torch.cuda.empty_cache()
         documents_str: str = format_documents(documents)
         # 获取参考文档并去重
-        references = list(set([get_filename(doc.metadata['source']) for doc in documents]))
+        references = list(
+            set([get_filename(doc.metadata["source"]) for doc in documents])
+        )
         references_str: str = format_references(references)
         return documents_str, references_str
 
@@ -268,13 +282,17 @@ if __name__ == "__main__":
     vector_database.create_faiss_vectordb(force=False)
     vector_database.load_faiss_vectordb()
     vector_database.create_faiss_retriever()
-    documents_str, references_str = vector_database.similarity_search("Eye Pressure Lowering Effect of Vitamin C")
+    documents_str, references_str = vector_database.similarity_search(
+        "Eye Pressure Lowering Effect of Vitamin C"
+    )
     print(f"references_str: {references_str}")
     documents_str, references_str = vector_database.similarity_search("吃了吗")
     print(f"references_str: {references_str}")
 
     vector_database.create_faiss_reranker_retriever()
-    documents_str, references_str = vector_database.similarity_search("Eye Pressure Lowering Effect of Vitamin C")
+    documents_str, references_str = vector_database.similarity_search(
+        "Eye Pressure Lowering Effect of Vitamin C"
+    )
     print(f"references_str: {references_str}")
     documents_str, references_str = vector_database.similarity_search("吃了吗")
     print(f"references_str: {references_str}")
