@@ -468,6 +468,7 @@ class TransfomersEngine(DeployEngine):
 
         # https://huggingface.co/internlm/internlm2-chat-1_8b/blob/main/modeling_internlm2.py#L1185
         # stream_chat 返回的句子长度是逐渐边长的,length的作用是记录之前的输出长度,用来截断之前的输出
+        length = 0
         # for response, history in self.model.stream_chat( # only for internlm2
         for response, _ in self.__stream_chat(
             tokenizer=self.tokenizer,
@@ -480,9 +481,10 @@ class TransfomersEngine(DeployEngine):
             top_k=top_k,
             meta_instruction=self.config.system_prompt,
         ):
-            logger.info(f"response: {response}")
-            if response is not None:
-                yield response
+            if response:
+                logger.info(f"response: {response[length:]}")
+                yield response[length:]
+                length = len(response)
 
 
 class LmdeployEngine(DeployEngine):
@@ -953,7 +955,6 @@ class LmdeployLocalEngine(LmdeployEngine):
         )
         logger.info(f"gen_config: {gen_config}")
 
-        responses = []
         # 放入 [{},{}] 格式返回一个response
         # 放入 [] 或者 [[{},{}]] 格式返回一个response列表
         response: Response
@@ -970,10 +971,8 @@ class LmdeployLocalEngine(LmdeployEngine):
             # Response(text='很高兴', generate_token_len=10, input_token_len=111, session_id=0, finish_reason=None)
             # Response(text='认识', generate_token_len=11, input_token_len=111, session_id=0, finish_reason=None)
             # Response(text='你', generate_token_len=12, input_token_len=111, session_id=0, finish_reason=None)
-            responses.append(response.text)
-            yield "".join(responses)
-
-        logger.info(f"response_text: {''.join(responses)}")
+            if response.text:
+                yield response.text
 
 
 class LmdeployServeEngine(LmdeployEngine):
@@ -1051,7 +1050,6 @@ class LmdeployServeEngine(LmdeployEngine):
             )
         )
 
-        responses = []
         response: dict
         for response in self.api_client.chat_completions_v1(
             model=self.config.model_name,
@@ -1120,13 +1118,10 @@ class LmdeployServeEngine(LmdeployEngine):
                 content = response["choices"][0]["delta"]["content"]
             else:
                 content = response["choices"][0]["message"]["content"]
-            if not content:
-                continue
 
-            responses.append(content)
-            yield "".join(responses)
+            if content:
+                yield content
 
-        logger.info(f"response_text: {''.join(responses)}")
 
     def chat_interactive_v1(
         self,
@@ -1167,7 +1162,6 @@ class LmdeployServeEngine(LmdeployEngine):
             )
         )
 
-        responses = []
         response: dict
         for response in self.api_client.chat_interactive_v1(
             prompt=messages,
@@ -1189,13 +1183,9 @@ class LmdeployServeEngine(LmdeployEngine):
             # {'text': '我可以', 'tokens': 1, 'input_tokens': 179, 'history_tokens': 0, 'finish_reason': None}
 
             content = response.get("text", "")
-            if not content:
-                continue
+            if content:
+                yield content
 
-            responses.append(content)
-            yield "".join(responses)
-
-        logger.info(f"response_text: {''.join(responses)}")
 
     def chat(
         self,
@@ -1418,7 +1408,6 @@ class ApiEngine(DeployEngine):
                 top_p=top_p,
             )
 
-            responses = []
             for chunk in completion:
                 # ChatCompletionChunk(
                 #   id='chatcmpl-02ab3417a31449398bd950e1a8cf12a1',
@@ -1443,12 +1432,8 @@ class ApiEngine(DeployEngine):
                 # )
                 logger.info(f"response: {chunk}")
                 content = chunk.choices[0].delta.content
-                if not content:
-                    continue
-                responses.append(content)
-                yield "".join(responses)
-
-            logger.info(f"response_text: {''.join(responses)}")
+                if content:
+                    yield content
 
         except Exception as e:
             logger.error(e)

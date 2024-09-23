@@ -146,6 +146,7 @@ def chat(
 
     yield history + [[query, None]], disable_btn, disable_btn, disable_btn, disable_btn
 
+    responses = []
     for response in infer_engine.chat_stream(
         query=prompt,
         history=history_without_reference,
@@ -155,13 +156,15 @@ def chat(
         top_k=top_k,
         session_id=session_id,
     ):
-        yield history + [[query, response]], disable_btn, disable_btn, disable_btn, disable_btn
+        responses.append(response)
+        yield history + [[query, "".join(responses)]], disable_btn, disable_btn, disable_btn, disable_btn
 
+    _response = "".join(responses)
     # 加上参考文档
-    yield history + [[query, response + references_str]], enable_btn, enable_btn, enable_btn, enable_btn
+    yield history + [[query, _response + references_str]], enable_btn, enable_btn, enable_btn, enable_btn
     logger.info(f"references_str: {references_str}")
     logger.info(
-        f"history_without_rag: {history + [[query, response + references_str]]}"
+        f"history_without_rag: {history + [[query, _response + references_str]]}"
     )
 
 
