@@ -14,16 +14,16 @@ TEXT_SPLITTER_TYPE = 'ChineseRecursiveTextSplitter'
 
 # 向量数据库
 vector_database = VectorDatabase(
-    data_path = DATA_PATH,
-    embedding_model_path = EMBEDDING_MODEL_PATH,
-    reranker_model_path = RERANKER_MODEL_PATH,
-    persist_directory = PERSIST_DIRECTORY,
-    similarity_top_k = SIMILARITY_TOP_K,
-    similarity_fetch_k = SIMILARITY_FETCH_K,
-    score_threshold = SCORE_THRESHOLD,
-    allow_suffix = ALLOW_SUFFIX,
-    device = VECTOR_DEVICE,
-    text_splitter_type = TEXT_SPLITTER_TYPE,
+    data_path=DATA_PATH,
+    embedding_model_path=EMBEDDING_MODEL_PATH,
+    reranker_model_path=RERANKER_MODEL_PATH,
+    persist_directory=PERSIST_DIRECTORY,
+    similarity_top_k=SIMILARITY_TOP_K,
+    similarity_fetch_k=SIMILARITY_FETCH_K,
+    score_threshold=SCORE_THRESHOLD,
+    allow_suffix=ALLOW_SUFFIX,
+    device=VECTOR_DEVICE,
+    text_splitter_type=TEXT_SPLITTER_TYPE,
 )
 
 # 创建数据库

@@ -14,27 +14,31 @@ def load_model(
     print("transformers version: ", transformers.__version__)
 
     # tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, trust_remote_code = True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        pretrained_model_name_or_path, trust_remote_code=True
+    )
 
     # 量化
     quantization_config = BitsAndBytesConfig(
-        load_in_4bit = load_in_4bit,                # 是否在4位精度下加载模型。如果设置为True，则在4位精度下加载模型。
-        load_in_8bit = False if load_in_4bit else load_in_8bit,
-        llm_int8_threshold = 6.0,
-        llm_int8_has_fp16_weight = False,
-        bnb_4bit_compute_dtype = torch.bfloat16,    # 4位精度计算的数据类型。这里设置为torch.bfloat16，表示使用半精度浮点数。
-        bnb_4bit_quant_type = 'nf4',                # 4位精度量化的类型。这里设置为"nf4"，表示使用nf4量化类型。 nf4: 4bit-NormalFloat
-        bnb_4bit_use_double_quant = True,           # 是否使用双精度量化。如果设置为True，则使用双精度量化。
+        load_in_4bit=load_in_4bit,  # 是否在4位精度下加载模型。如果设置为True，则在4位精度下加载模型。
+        load_in_8bit=False if load_in_4bit else load_in_8bit,
+        llm_int8_threshold=6.0,
+        llm_int8_has_fp16_weight=False,
+        bnb_4bit_compute_dtype=torch.bfloat16,  # 4位精度计算的数据类型。这里设置为torch.bfloat16，表示使用半精度浮点数。
+        bnb_4bit_quant_type="nf4",  # 4位精度量化的类型。这里设置为"nf4"，表示使用nf4量化类型。 nf4: 4bit-NormalFloat
+        bnb_4bit_use_double_quant=True,  # 是否使用双精度量化。如果设置为True，则使用双精度量化。
     )
 
     # 创建模型
     model = AutoModelForCausalLM.from_pretrained(
         pretrained_model_name_or_path,
-        torch_dtype = torch.bfloat16,
-        trust_remote_code = True,
-        device_map = 'auto',
-        low_cpu_mem_usage = True,   # 是否使用低CPU内存,使用 device_map 参数必须为 True
-        quantization_config = quantization_config if load_in_8bit or load_in_4bit else None,
+        torch_dtype=torch.bfloat16,
+        trust_remote_code=True,
+        device_map="auto",
+        low_cpu_mem_usage=True,  # 是否使用低CPU内存,使用 device_map 参数必须为 True
+        quantization_config=quantization_config
+        if load_in_8bit or load_in_4bit
+        else None,
     )
 
     if adapter_path:
@@ -53,7 +57,7 @@ def load_model(
     return tokenizer, model
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # clone 模型
     pretrained_model_name_or_path = "../models/internlm2_5-1_8b-chat"
     # os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2_5-1_8b-chat.git {pretrained_model_name_or_path}')
@@ -64,6 +68,8 @@ if __name__ == '__main__':
     load_in_8bit = False
     load_in_4bit = False
 
-    tokenizer, model = load_model(pretrained_model_name_or_path, adapter_path, load_in_8bit, load_in_4bit)
+    tokenizer, model = load_model(
+        pretrained_model_name_or_path, adapter_path, load_in_8bit, load_in_4bit
+    )
     print(tokenizer)
     print(model)
