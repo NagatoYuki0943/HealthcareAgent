@@ -12,13 +12,16 @@ def requests_chat(data: dict):
     response: requests.Response = requests.post(
         URL, json=data, timeout=60, stream=stream
     )
-    for chunk in response.iter_lines(
-        chunk_size=8192, decode_unicode=False, delimiter=b"\n"
-    ):
-        if chunk:
-            decoded = chunk.decode("utf-8")
-            output = json.loads(decoded)
-            yield output
+    if not stream:
+        yield response.json()
+    else:
+        for chunk in response.iter_lines(
+            chunk_size=8192, decode_unicode=False, delimiter=b"\n"
+        ):
+            if chunk:
+                decoded = chunk.decode("utf-8")
+                output = json.loads(decoded)
+                yield output
 
 
 if __name__ == "__main__":
