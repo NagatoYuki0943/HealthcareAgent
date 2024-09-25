@@ -150,6 +150,9 @@ class Response(BaseModel):
         description="List of references retrieved from the database",
     )
 
+    def __str__(self) -> str:
+        return self.model_dump_json()
+
 
 def generate(
     messages: Sequence[dict],
@@ -188,7 +191,7 @@ def generate(
                 top_k,
                 random_uuid_int(),
             ):
-                yield Response(response=response, references=references).model_dump_json()
+                yield Response(response=response, references=references).model_dump_json() + "\n"
 
         return StreamingResponse(generate())
 

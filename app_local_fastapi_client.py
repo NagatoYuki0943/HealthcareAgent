@@ -1,45 +1,40 @@
+# copy from https://github.com/NagatoYuki0943/fastapi-learn/blob/main/xx_stream/client.py
+
 import requests
+import json
 
 
-url = "http://localhost:8000/chat"
+URL = "http://localhost:8000/chat"
 
 
 def requests_chat(data: dict):
-    data["stream"] = False
-    response: requests.Response = requests.post(url, json=data, timeout=60)
-    if response.status_code!= 200:
-        print(f"Error: {response.status_code} {response.text}")
-    return response.json()
+    stream = data["stream"]
+    response: requests.Response = requests.post(
+        URL, json=data, timeout=60, stream=stream
+    )
+    for chunk in response.iter_lines(
+        chunk_size=8192, decode_unicode=False, delimiter=b"\n"
+    ):
+        if chunk:
+            decoded = chunk.decode("utf-8")
+            output = json.loads(decoded)
+            yield output
 
 
-def requests_stream_chat(data: dict):
-    data["stream"] = True
-    response: requests.Response = requests.post(url, json=data, timeout=60, stream=True)
-    if response.status_code!= 200:
-        raise Exception(f"Error: {response.status_code} {response.text}")
-    for line in response.iter_lines():
-        if line:
-            chunk = line.decode('utf-8')
-            if chunk.startswith('data:') and chunk != 'data: [DONE]':
-                delta = chunk.split('data: ')[1]
-                print(delta)
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     data = {
-        "messages": [
-            {
-                "content": "维生素E有什么作用?",
-                "role": "user"
-            }
-        ],
+        "messages": [{"content": "维生素E有什么作用", "role": "user"}],
         "max_new_tokens": 1024,
         "temperature": 0.8,
         "top_p": 0.8,
         "top_k": 50,
         "stream": False,
     }
+    data_stream = data.copy()
+    data_stream["stream"] = True
 
-    ret = requests_chat(data)
-    print(ret)
-    print()
+    for output in requests_chat(data):
+        print(output)
+
+    for output in requests_chat(data_stream):
+        print(output)
