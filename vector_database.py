@@ -259,7 +259,7 @@ class VectorDatabase:
     def similarity_search(
         self,
         query: str,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, list]:
         assert (
             self.retriever is not None
         ), "请先调用 `create_faiss_retriever` 或者 `create_faiss_reranker_retriever` 创建检索器"
@@ -273,8 +273,8 @@ class VectorDatabase:
         references = list(
             set([get_filename(doc.metadata["source"]) for doc in documents])
         )
-        references_str: str = format_references(references)
-        return documents_str, references_str
+
+        return documents_str, references
 
 
 if __name__ == "__main__":

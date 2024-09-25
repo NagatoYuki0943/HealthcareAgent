@@ -16,7 +16,7 @@ from modelscope import snapshot_download
 from vector_database import VectorDatabase
 from infer_engine import InferEngine, ApiConfig
 from infer_utils import convert_gradio_to_openai_format
-from utils import remove_history_references, download_openxlab_dataset
+from utils import remove_history_references, download_openxlab_dataset, format_references
 from ocr_chat import get_ernie_access_token, ocr_detection
 
 
@@ -168,9 +168,10 @@ def chat(
     logger.info(f"query: {query}")
 
     # 数据库检索
-    documents_str, references_str = vector_database.similarity_search(
+    documents_str, references = vector_database.similarity_search(
         query=query,
     )
+    references_str: str = format_references(references)
 
     # 格式化rag文件
     prompt = (

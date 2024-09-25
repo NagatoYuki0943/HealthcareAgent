@@ -4,7 +4,7 @@ import threading
 from loguru import logger
 from infer_engine import InferEngine, TransformersConfig, LmdeployConfig
 from vector_database import VectorDatabase
-from utils import remove_history_references
+from utils import remove_history_references, format_references
 
 
 log_file = logger.add("log/runtime_{time}.log", rotation="00:00")
@@ -128,9 +128,10 @@ def chat(
     logger.info(f"query: {query}")
 
     # 数据库检索
-    documents_str, references_str = vector_database.similarity_search(
+    documents_str, references = vector_database.similarity_search(
         query=query,
     )
+    references_str: str = format_references(references)
 
     # 格式化rag文件
     prompt = (
