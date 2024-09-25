@@ -1,3 +1,5 @@
+# https://github.com/NagatoYuki0943/xlab-huanhuan/blob/master/load/infer_engine_fastapi_server.py
+
 from typing import Sequence
 from loguru import logger
 from fastapi import FastAPI, HTTPException
@@ -98,45 +100,6 @@ infer_engine = InferEngine(
 )
 
 
-def generate(
-    messages: Sequence[dict],
-    max_new_tokens: int = 1024,
-    temperature: float = 0.8,
-    top_p: float = 0.8,
-    top_k: int = 40,
-) -> tuple[str, list]:
-    content: str = messages[-1].get("content", "")
-
-    # 数据库检索
-    documents_str, references = vector_database.similarity_search(
-        content,
-    )
-
-    # 格式化rag文件
-    prompt = (
-        TEMPLATE.format(context=documents_str, question=content)
-        if documents_str
-        else content
-    )
-    logger.info(f"prompt: {prompt}")
-
-    # 更新最后一条消息
-    messages[-1]['content'] = prompt
-
-    # 生成回复
-    response = infer_engine.chat(
-        messages,
-        None,
-        max_new_tokens,
-        temperature,
-        top_p,
-        top_k,
-        session_id=random_uuid_int(),
-    )
-
-    return response, references
-
-
 app = FastAPI()
 
 
@@ -146,7 +109,7 @@ class Query(BaseModel):
         None,
         description="List of dictionaries containing the input text and the corresponding user id",
         examples=[
-            [{"role": "user", "content": "你是谁?"}]
+            [{"role": "user", "content": "维生素E对于眼睛有什么作用?"}]
         ]
     )
     max_new_tokens: int = Field(
@@ -182,17 +145,72 @@ class Response(BaseModel):
         description="Generated text response",
         examples=["InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室)."]
     )
-    rerferences: list[str] = Field(
+    references: list[str] = Field(
         None,
         description="List of references retrieved from the database",
     )
+
+
+def generate(
+    messages: Sequence[dict],
+    max_new_tokens: int = 1024,
+    temperature: float = 0.8,
+    top_p: float = 0.8,
+    top_k: int = 40,
+    stream: bool = False,
+) -> StreamingResponse | Response:
+    content: str = messages[-1].get("content", "")
+
+    # 数据库检索
+    documents_str, references = vector_database.similarity_search(
+        content,
+    )
+
+    # 格式化rag文件
+    prompt = (
+        TEMPLATE.format(context=documents_str, question=content)
+        if documents_str
+        else content
+    )
+    logger.info(f"prompt: {prompt}")
+
+    # 更新最后一条消息
+    messages[-1]['content'] = prompt
+
+    if stream:
+        async def generate():
+            for response in infer_engine.chat_stream(
+                messages,
+                None,
+                max_new_tokens,
+                temperature,
+                top_p,
+                top_k,
+                random_uuid_int(),
+            ):
+                yield Response(response=response, references=references).model_dump_json()
+
+        return StreamingResponse(generate())
+
+    # 生成回复
+    response = infer_engine.chat(
+        messages,
+        None,
+        max_new_tokens,
+        temperature,
+        top_p,
+        top_k,
+        random_uuid_int(),
+    )
+
+    return Response(response=response, references=references)
 
 
 # 将请求体作为 JSON 读取
 # 在函数内部，你可以直接访问模型对象的所有属性
 # http://127.0.0.1:8000/docs
 @app.post("/chat", response_model=Response)
-async def chat(query: Query):
+async def chat(query: Query) -> StreamingResponse | Response:
     print(query)
 
     if not query.messages or len(query.messages) == 0:
@@ -206,18 +224,16 @@ async def chat(query: Query):
     if not content:
         raise HTTPException(status_code=400, detail="content is empty")
 
-    response, rerferences = generate(
+    return generate(
         query.messages,
         query.max_new_tokens,
         query.temperature,
         query.top_p,
         query.top_k,
+        query.stream,
     )
 
-    return Response(response=response, rerferences=rerferences)
-
-
-# uvicorn app_local_fastapi:app --reload --port=8000
+# uvicorn app_local_fastapi_server:app --reload --port=8000
 # uvicorn main:app --reload --port=8000
 #   main: main.py 文件(一个 Python「模块」)。
 #   app: 在 main.py 文件中通过 app = FastAPI() 创建的对象。
