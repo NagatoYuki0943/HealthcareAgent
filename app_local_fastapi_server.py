@@ -112,7 +112,7 @@ class Query(BaseModel):
             [{"role": "user", "content": "维生素E对于眼睛有什么作用?"}]
         ]
     )
-    max_new_tokens: int = Field(
+    max_tokens: int = Field(
         1024, ge=1, le=2048, description="Maximum number of new tokens to generate"
     )
     temperature: float = Field(
@@ -146,7 +146,7 @@ class Response(BaseModel):
         examples=["InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室)."]
     )
     references: list[str] = Field(
-        None,
+        [],
         description="List of references retrieved from the database",
     )
 
@@ -191,7 +191,8 @@ def generate(
                 top_k,
                 random_uuid_int(),
             ):
-                yield Response(response=response, references=references).model_dump_json() + "\n"
+                yield Response(response=response, references=[]).model_dump_json() + "\n"
+            yield Response(response="", references=references).model_dump_json() + "\n"
 
         return StreamingResponse(generate())
 
@@ -229,7 +230,7 @@ async def chat(query: Query) -> StreamingResponse | Response:
 
     return generate(
         query.messages,
-        query.max_new_tokens,
+        query.max_tokens,
         query.temperature,
         query.top_p,
         query.top_k,

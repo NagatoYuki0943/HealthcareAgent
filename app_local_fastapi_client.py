@@ -9,25 +9,27 @@ URL = "http://localhost:8000/chat"
 
 def requests_chat(data: dict):
     stream = data["stream"]
+
     response: requests.Response = requests.post(
         URL, json=data, timeout=60, stream=stream
     )
     if not stream:
         yield response.json()
     else:
+        chunk: bytes
         for chunk in response.iter_lines(
             chunk_size=8192, decode_unicode=False, delimiter=b"\n"
         ):
             if chunk:
-                decoded = chunk.decode("utf-8")
-                output = json.loads(decoded)
+                decoded: str = chunk.decode("utf-8")
+                output: dict = json.loads(decoded)
                 yield output
 
 
 if __name__ == "__main__":
     data = {
-        "messages": [{"content": "维生素E有什么作用", "role": "user"}],
-        "max_new_tokens": 1024,
+        "messages": [{"role": "user", "content": "维生素E有什么作用"}],
+        "max_tokens": 1024,
         "temperature": 0.8,
         "top_p": 0.8,
         "top_k": 50,
