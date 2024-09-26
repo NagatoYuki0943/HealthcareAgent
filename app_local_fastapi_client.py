@@ -17,7 +17,7 @@ headers = {
 
 # https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_client.py
 def requests_chat(data: dict):
-    stream = data["stream"]
+    stream: bool = data["stream"]
 
     response: requests.Response = requests.post(
         URL, json=data, headers=headers, timeout=60, stream=stream
