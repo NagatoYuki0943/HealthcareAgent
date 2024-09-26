@@ -191,8 +191,9 @@ def generate(
                 top_k,
                 random_uuid_int(),
             ):
-                yield Response(response=response, references=[]).model_dump_json() + "\n"
-            yield Response(response="", references=references).model_dump_json() + "\n"
+                # openai api returns \n\n as a delimiter for messages
+                yield Response(response=response, references=[]).model_dump_json() + "\n\n"
+            yield Response(response="", references=references).model_dump_json() + "\n\n"
 
         return StreamingResponse(generate())
 

@@ -6,24 +6,32 @@ import json
 
 URL = "http://localhost:8000/chat"
 
+api_key = "I AM AN API_KEY"
 
+headers = {
+    "accept": "application/json",
+    "content-type": "application/json",
+    "Authorization": f"Bearer {api_key}",
+}
+
+
+# https://github.com/InternLM/lmdeploy/blob/main/lmdeploy/serve/openai/api_client.py
 def requests_chat(data: dict):
     stream = data["stream"]
 
     response: requests.Response = requests.post(
-        URL, json=data, timeout=60, stream=stream
+        URL, json=data, headers=headers, timeout=60, stream=stream
     )
     if not stream:
         yield response.json()
     else:
         chunk: bytes
         for chunk in response.iter_lines(
-            chunk_size=8192, decode_unicode=False, delimiter=b"\n"
+            chunk_size=8192, decode_unicode=False, delimiter=b"\n\n"
         ):
             if chunk:
                 decoded: str = chunk.decode("utf-8")
-                output: dict = json.loads(decoded)
-                yield output
+                yield json.loads(decoded)
 
 
 if __name__ == "__main__":
