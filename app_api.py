@@ -250,42 +250,31 @@ def ocr_chat(img, query, history: list, current_img: str):
     logger.info(f"{img = }")
     logger.info(f"{current_img = }")
 
+    if query is None and img is None:
+        yield "", history, current_img
+
     # 有图片且图片不是之前的图片才使用ocr
     if img is not None and img != current_img:
         logger.warning("use ocr")
         ocr_result: str = ocr_detection(img, ocr_secret_id, ocr_secret_key)
-        txt = f"图片ocr检测结果:\n<ocr>\n{ocr_result}\n</ocr>\n question: {query}"
+        _query = f"图片ocr检测结果:\n<ocr>\n{ocr_result}\n</ocr>\n question: {query}"
         current_img = img
     else:
-        txt = query
-    logger.info(f"{txt = }")
+        _query = query
+    logger.info(f"{_query = }")
 
-    url = (
-        "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-speed-128k?access_token="
-        + get_ernie_access_token(ernie_api_key, ernie_secret_key)
-    )
-
-    # 将历史记录转换为openai格式
-    prompts = convert_gradio_to_openai_format(history, txt)
-    logger.info(f"{prompts = }")
-    payload = json.dumps({"messages": prompts})
-    headers = {"Content-Type": "application/json"}
-
-    if query is None and img is None:
-        return "", history, current_img
-    try:
-        res = requests.request("POST", url, headers=headers, data=payload).json()
-        logger.info(f"{res = }")
-        response = res["result"]
-        logger.info(f"{query = }")
-        logger.info(f"{response = }")
-        history.append([query, response])
-        logger.info(f"{history = }")
-
-        return "", history, current_img
-    except Exception as e:
-        logger.error(f"{e = }")
-        return e, history, current_img
+    responses = []
+    for response in infer_engine.chat_stream(
+        _query,
+        history=history,
+        max_new_tokens=1024,
+        temperature=0.8,
+        top_p=0.8,
+        top_k=40,
+        session_id=None,
+    ):
+        responses.append(response)
+        yield "", history + [[query, "".join(responses)]], current_img
 
 
 def main() -> None:
