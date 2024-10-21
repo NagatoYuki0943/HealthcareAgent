@@ -2,7 +2,7 @@ __pycache__/
 .vscode/
 .idea/
 
-models/
+models/*
 work_dirs/
 data/
 vector_db/

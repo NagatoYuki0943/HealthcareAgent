@@ -16,7 +16,11 @@ from modelscope import snapshot_download
 from vector_database import VectorDatabase
 from infer_engine import InferEngine, ApiConfig
 from infer_utils import convert_gradio_to_openai_format
-from utils import remove_history_references, download_openxlab_dataset, format_references
+from utils import (
+    remove_history_references,
+    download_openxlab_dataset,
+    format_references,
+)
 from ocr_chat import get_ernie_access_token, ocr_detection
 
 
@@ -199,11 +203,23 @@ def chat(
         session_id=session_id,
     ):
         responses.append(response)
-        yield history + [[query, "".join(responses)]], disable_btn, disable_btn, disable_btn, disable_btn
+        yield (
+            history + [[query, "".join(responses)]],
+            disable_btn,
+            disable_btn,
+            disable_btn,
+            disable_btn,
+        )
 
     _response = "".join(responses)
     # 加上参考文档
-    yield history + [[query, _response + references_str]], enable_btn, enable_btn, enable_btn, enable_btn
+    yield (
+        history + [[query, _response + references_str]],
+        enable_btn,
+        enable_btn,
+        enable_btn,
+        enable_btn,
+    )
     logger.info(f"references_str: {references_str}")
     logger.info(
         f"history_without_rag: {history + [[query, _response + references_str]]}"

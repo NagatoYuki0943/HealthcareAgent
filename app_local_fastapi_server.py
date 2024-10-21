@@ -51,14 +51,6 @@ vector_database.load_faiss_vectordb()
 # 创建重排序 retriever
 vector_database.create_faiss_reranker_retriever()
 
-# clone 模型
-PRETRAINED_MODEL_NAME_OR_PATH = "./models/internlm2_5-1_8b-chat"
-# os.system(f'git clone https://code.openxlab.org.cn/OpenLMLab/internlm2_5-1_8b-chat.git {PRETRAINED_MODEL_NAME_OR_PATH}')
-# os.system(f'cd {PRETRAINED_MODEL_NAME_OR_PATH} && git lfs pull')
-ADAPTER_PATH = None
-# 量化
-LOAD_IN_8BIT = False
-LOAD_IN_4BIT = False
 
 SYSTEM_PROMPT = """
 你是医疗保健智能体，名字叫做 "HeathcareAgent"。
@@ -364,11 +356,12 @@ def generate(
     logger.info(f"prompt: {prompt}")
 
     # 更新最后一条消息
-    messages[-1]['content'] = prompt
+    messages[-1]["content"] = prompt
 
     session_id = random_uuid_int()
 
     if stream:
+
         async def generate():
             response_len = 0
             for response_str in infer_engine.chat_stream(
@@ -491,6 +484,7 @@ async def chat(request: ChatRequest) -> StreamingResponse | ChatCompletion:
         request.top_k,
         request.stream,
     )
+
 
 # uvicorn app_local_fastapi_server:app --reload --port=8000
 # uvicorn main:app --reload --port=8000

@@ -1122,7 +1122,6 @@ class LmdeployServeEngine(LmdeployEngine):
             if content:
                 yield content
 
-
     def chat_interactive_v1(
         self,
         query: str | VLQueryType | list[dict],
@@ -1185,7 +1184,6 @@ class LmdeployServeEngine(LmdeployEngine):
             content = response.get("text", "")
             if content:
                 yield content
-
 
     def chat(
         self,

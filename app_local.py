@@ -158,11 +158,23 @@ def chat(
         session_id=session_id,
     ):
         responses.append(response)
-        yield history + [[query, "".join(responses)]], disable_btn, disable_btn, disable_btn, disable_btn
+        yield (
+            history + [[query, "".join(responses)]],
+            disable_btn,
+            disable_btn,
+            disable_btn,
+            disable_btn,
+        )
 
     _response = "".join(responses)
     # 加上参考文档
-    yield history + [[query, _response + references_str]], enable_btn, enable_btn, enable_btn, enable_btn
+    yield (
+        history + [[query, _response + references_str]],
+        enable_btn,
+        enable_btn,
+        enable_btn,
+        enable_btn,
+    )
     logger.info(f"references_str: {references_str}")
     logger.info(
         f"history_without_rag: {history + [[query, _response + references_str]]}"
