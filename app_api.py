@@ -128,6 +128,7 @@ API_CONFIG = ApiConfig(
     base_url="https://api.siliconflow.cn/v1",
     api_key=api_key,
     model="internlm/internlm2_5-7b-chat",
+    system_prompt=SYSTEM_PROMPT,
 )
 
 # 载入模型
