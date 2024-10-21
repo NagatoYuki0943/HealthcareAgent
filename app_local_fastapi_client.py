@@ -31,11 +31,16 @@ def requests_chat(data: dict):
         ):
             if chunk:
                 decoded: str = chunk.decode("utf-8")
-                yield json.loads(decoded)
+                if decoded.startswith("data: "):
+                    decoded = decoded[6:]
+                    if decoded.strip() == "[DONE]":
+                        continue
+                    yield json.loads(decoded)
 
 
 if __name__ == "__main__":
     data = {
+        "model": "model_1",
         "messages": [{"role": "user", "content": "维生素E有什么作用"}],
         "max_tokens": 1024,
         "temperature": 0.8,

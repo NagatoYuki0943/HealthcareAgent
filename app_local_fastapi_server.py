@@ -1,17 +1,22 @@
 # https://github.com/NagatoYuki0943/xlab-huanhuan/blob/master/load/infer_engine_fastapi_server.py
-
+import os
+import time
 from typing import Sequence
 from loguru import logger
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from infer_engine import InferEngine, TransformersConfig, LmdeployConfig
+from infer_engine import InferEngine, ApiConfig
 from infer_utils import random_uuid_int
 from vector_database import VectorDatabase
 
 
 log_file = logger.add("log/runtime_{time}.log", rotation="00:00")
+
+# -------------------------silicon API---------------------------#
+api_key = os.getenv("API_KEY", "")
+logger.info(f"{api_key = }")
 
 
 DATA_PATH: str = "./data"
@@ -71,49 +76,42 @@ TEMPLATE = """上下文:
 请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理(除非用户指定了回答的语言，否则用户使用什么语言就用什么语言回答):"""
 # 请使用提供的上下文来回答问题，如果上下文不足请根据自己的知识给出合适的回答，回答应该有条理:"""
 
-TRANSFORMERS_CONFIG = TransformersConfig(
-    pretrained_model_name_or_path=PRETRAINED_MODEL_NAME_OR_PATH,
-    adapter_path=ADAPTER_PATH,
-    load_in_8bit=LOAD_IN_8BIT,
-    load_in_4bit=LOAD_IN_4BIT,
-    model_name="internlm2",
+API_CONFIG = ApiConfig(
+    base_url="https://api.siliconflow.cn/v1",
+    api_key=api_key,
+    model="internlm/internlm2_5-7b-chat",
     system_prompt=SYSTEM_PROMPT,
-)
-
-LMDEPLOY_CONFIG = LmdeployConfig(
-    model_path=PRETRAINED_MODEL_NAME_OR_PATH,
-    backend="turbomind",
-    model_name="internlm2",
-    model_format="hf",
-    cache_max_entry_count=0.5,  # 调整 KV Cache 的占用比例为0.5
-    quant_policy=0,  # KV Cache 量化, 0 代表禁用, 4 代表 4bit 量化, 8 代表 8bit 量化
-    system_prompt=SYSTEM_PROMPT,
-    deploy_method="local",
-    log_level="ERROR",
 )
 
 # 载入模型
 infer_engine = InferEngine(
-    backend="transformers",  # transformers, lmdeploy, api
-    transformers_config=TRANSFORMERS_CONFIG,
-    lmdeploy_config=LMDEPLOY_CONFIG,
+    backend="api",  # transformers, lmdeploy, api
+    api_config=API_CONFIG,
 )
-
 
 app = FastAPI()
 
 
 # 与声明查询参数一样，包含默认值的模型属性是可选的，否则就是必选的。默认值为 None 的模型属性也是可选的。
 class ChatRequest(BaseModel):
+    model: str | None = Field(
+        None,
+        description="The model used for generating the response",
+        examples=["gpt4o", "gpt4"],
+    )
     messages: list[dict[str, str]] = Field(
         None,
         description="List of dictionaries containing the input text and the corresponding user id",
-        examples=[
-            [{"role": "user", "content": "维生素E对于眼睛有什么作用?"}]
-        ]
+        examples=[[{"role": "user", "content": "你是谁?"}]],
     )
     max_tokens: int = Field(
         1024, ge=1, le=2048, description="Maximum number of new tokens to generate"
+    )
+    n: int = Field(
+        1,
+        ge=1,
+        le=10,
+        description="Number of completions to generate for each prompt",
     )
     temperature: float = Field(
         0.8,
@@ -139,18 +137,205 @@ class ChatRequest(BaseModel):
     )
 
 
-class Response(BaseModel):
-    response: str = Field(
+# -------------------- 非流式响应模型 --------------------#
+class ChatCompletionMessage(BaseModel):
+    content: str | None = Field(
         None,
-        description="Generated text response",
-        examples=["InternLM (书生·浦语) is a conversational language model that is developed by Shanghai AI Laboratory (上海人工智能实验室)."]
+        description="The input text of the user or assistant",
+        examples=["你是谁?"],
     )
-    references: list[str] = Field(
-        [],
-        description="List of references retrieved from the database",
+    # 允许添加额外字段
+    reference: list[str] | None = Field(
+        None,
+        description="The reference text(s) used for generating the response",
+        examples=[["book1", "book2"]],
+    )
+    role: str = Field(
+        None,
+        description="The role of the user or assistant",
+        examples=["system", "user", "assistant"],
+    )
+    refusal: bool = Field(
+        False,
+        description="Whether the user or assistant refused to provide a response",
+        examples=[False, True],
+    )
+    function_call: str | None = Field(
+        None,
+        description="The function call that the user or assistant made",
+        examples=["ask_name", "ask_age", "ask_location"],
+    )
+    tool_calls: str | None = Field(
+        None,
+        description="The tool calls that the user or assistant made",
+        examples=["weather", "calendar", "news"],
     )
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
+        return self.model_dump_json()
+
+
+class ChatCompletionChoice(BaseModel):
+    index: int = Field(
+        None,
+        description="The index of the choice",
+        examples=[0, 1, 2],
+    )
+    finish_reason: str | None = Field(
+        None,
+        description="The reason for finishing the conversation",
+        examples=[None, "stop"],
+    )
+    logprobs: list[float] | None = Field(
+        None,
+        description="The log probabilities of the choices",
+        examples=[-1.3862943611198906, -1.3862943611198906, -1.3862943611198906],
+    )
+    message: ChatCompletionMessage | None = Field(
+        None,
+        description="The message generated by the model",
+    )
+
+    def __repr__(self) -> str:
+        return self.model_dump_json()
+
+
+class CompletionUsage(BaseModel):
+    prompt_tokens: int = Field(
+        0,
+        description="The number of tokens in the prompt",
+        examples=[10],
+    )
+    completion_tokens: int = Field(
+        0,
+        description="The number of tokens in the completion",
+        examples=[10],
+    )
+    total_tokens: int = Field(
+        0,
+        description="The total number of tokens generated",
+        examples=[10],
+    )
+
+    def __repr__(self) -> str:
+        return self.model_dump_json()
+
+
+class ChatCompletion(BaseModel):
+    id: str | int | None = Field(
+        None,
+        description="The id of the conversation",
+        examples=[123456, "abc123"],
+    )
+    choices: list[ChatCompletionChoice] = Field(
+        [],
+        description="The choices generated by the model",
+    )
+    created: int | float | None = Field(
+        None,
+        description="The timestamp when the conversation was created",
+    )
+    model: str | None = Field(
+        None,
+        description="The model used for generating the response",
+        examples=["gpt4o", "gpt4"],
+    )
+    object: str = Field(
+        "chat.completion",
+        description="The object of the conversation",
+        examples=["chat.completion"],
+    )
+    service_tier: str | None = Field(
+        None,
+        description="The service tier of the conversation",
+        examples=["basic", "premium"],
+    )
+    system_fingerprint: str | None = Field(
+        None,
+        description="The system fingerprint of the conversation",
+        examples=["1234567890abcdef"],
+    )
+    usage: CompletionUsage = Field(
+        CompletionUsage(),
+        description="The usage of the completion",
+    )
+
+    def __repr__(self) -> str:
+        return self.model_dump_json()
+
+
+# -------------------- 非流式响应模型 --------------------#
+
+
+# -------------------- 流式响应模型 --------------------#
+class ChoiceDelta(ChatCompletionMessage): ...
+
+
+class ChatCompletionChunkChoice(BaseModel):
+    index: int = Field(
+        None,
+        description="The index of the choice",
+        examples=[0, 1, 2],
+    )
+    finish_reason: str | None = Field(
+        None,
+        description="The reason for finishing the conversation",
+        examples=[None, "stop"],
+    )
+    logprobs: list[float] | None = Field(
+        None,
+        description="The log probabilities of the choices",
+        examples=[-1.3862943611198906, -1.3862943611198906, -1.3862943611198906],
+    )
+    delta: ChoiceDelta | None = Field(
+        None,
+        description="The message generated by the model",
+    )
+
+    def __repr__(self) -> str:
+        return self.model_dump_json()
+
+
+class ChatCompletionChunk(BaseModel):
+    id: str | int | None = Field(
+        None,
+        description="The id of the conversation",
+        examples=[123456, "abc123"],
+    )
+    choices: list[ChatCompletionChunkChoice] = Field(
+        [],
+        description="The choices generated by the model",
+    )
+    created: int | float | None = Field(
+        None,
+        description="The timestamp when the conversation was created",
+    )
+    model: str | None = Field(
+        None,
+        description="The model used for generating the response",
+        examples=["gpt4o", "gpt4"],
+    )
+    object: str = Field(
+        "chat.completion.chunk",
+        description="The object of the conversation",
+        examples=["chat.completion.chunk"],
+    )
+    service_tier: str | None = Field(
+        None,
+        description="The service tier of the conversation",
+        examples=["basic", "premium"],
+    )
+    system_fingerprint: str | None = Field(
+        None,
+        description="The system fingerprint of the conversation",
+        examples=["1234567890abcdef"],
+    )
+    usage: CompletionUsage = Field(
+        None,
+        description="The usage of the completion",
+    )
+
+    def __repr__(self) -> str:
         return self.model_dump_json()
 
 
@@ -161,8 +346,9 @@ def generate(
     top_p: float = 0.8,
     top_k: int = 40,
     stream: bool = False,
-) -> StreamingResponse | Response:
+) -> StreamingResponse | ChatCompletion:
     content: str = messages[-1].get("content", "")
+    content_len: int = len(content)
 
     # 数据库检索
     documents_str, references = vector_database.similarity_search(
@@ -180,42 +366,110 @@ def generate(
     # 更新最后一条消息
     messages[-1]['content'] = prompt
 
+    session_id = random_uuid_int()
+
     if stream:
         async def generate():
-            for response in infer_engine.chat_stream(
+            response_len = 0
+            for response_str in infer_engine.chat_stream(
                 messages,
                 None,
                 max_new_tokens,
                 temperature,
                 top_p,
                 top_k,
-                random_uuid_int(),
+                session_id,
             ):
+                response_len += len(response_str)
+                response = ChatCompletionChunk(
+                    id=session_id,
+                    choices=[
+                        ChatCompletionChunkChoice(
+                            index=0,
+                            finish_reason=None,
+                            delta=ChoiceDelta(
+                                content=response_str,
+                                role="assistant",
+                            ),
+                        )
+                    ],
+                    created=time.time(),
+                    usage=CompletionUsage(
+                        prompt_tokens=content_len,
+                        completion_tokens=response_len,
+                        total_tokens=content_len + response_len,
+                    ),
+                )
+                print(response)
                 # openai api returns \n\n as a delimiter for messages
-                yield Response(response=response, references=[]).model_dump_json() + "\n\n"
-            yield Response(response="", references=references).model_dump_json() + "\n\n"
+                yield f"data: {response.model_dump_json()}\n\n"
+
+            response = ChatCompletionChunk(
+                id=session_id,
+                choices=[
+                    ChatCompletionChunkChoice(
+                        index=0,
+                        finish_reason="stop",
+                        delta=ChoiceDelta(
+                            reference=references,
+                        ),
+                    )
+                ],
+                created=time.time(),
+                usage=CompletionUsage(
+                    prompt_tokens=content_len,
+                    completion_tokens=response_len,
+                    total_tokens=content_len + response_len,
+                ),
+            )
+            print(response)
+            # openai api returns \n\n as a delimiter for messages
+            yield f"data: {response.model_dump_json()}\n\n"
+
+            yield "data: [DONE]\n\n"
 
         return StreamingResponse(generate())
 
     # 生成回复
-    response = infer_engine.chat(
+    response_str = infer_engine.chat(
         messages,
         None,
         max_new_tokens,
         temperature,
         top_p,
         top_k,
-        random_uuid_int(),
+        session_id,
     )
 
-    return Response(response=response, references=references)
+    # 非流式响应
+    response = ChatCompletion(
+        id=session_id,
+        choices=[
+            ChatCompletionChoice(
+                index=0,
+                finish_reason="stop",
+                message=ChatCompletionMessage(
+                    content=response_str,
+                    reference=references,
+                    role="assistant",
+                ),
+            ),
+        ],
+        created=time.time(),
+        usage=CompletionUsage(
+            prompt_tokens=content_len,
+            completion_tokens=len(response_str),
+            total_tokens=content_len + len(response_str),
+        ),
+    )
+    return response
 
 
 # 将请求体作为 JSON 读取
 # 在函数内部，你可以直接访问模型对象的所有属性
 # http://127.0.0.1:8000/docs
-@app.post("/chat", response_model=Response)
-async def chat(request: ChatRequest) -> StreamingResponse | Response:
+@app.post("/chat", response_model=ChatCompletion)
+async def chat(request: ChatRequest) -> StreamingResponse | ChatCompletion:
     print(request)
 
     if not request.messages or len(request.messages) == 0:
