@@ -1,12 +1,12 @@
 # copy from https://github.com/NagatoYuki0943/fastapi-learn/blob/main/xx_stream/client.py
-
+import os
 import requests
 import json
 
 
-URL = "http://localhost:8000/chat"
+URL = "http://localhost:8000/v1/chat/completions"
 
-api_key = "I AM AN API_KEY"
+api_key = os.getenv("API_KEY", "I AM AN API_KEY")
 
 headers = {
     "accept": "application/json",

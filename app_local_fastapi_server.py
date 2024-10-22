@@ -461,7 +461,7 @@ def generate(
 # 将请求体作为 JSON 读取
 # 在函数内部，你可以直接访问模型对象的所有属性
 # http://127.0.0.1:8000/docs
-@app.post("/chat", response_model=ChatCompletion)
+@app.post("/v1/chat/completions", response_model=ChatCompletion)
 async def chat(request: ChatRequest) -> StreamingResponse | ChatCompletion:
     print(request)
 
