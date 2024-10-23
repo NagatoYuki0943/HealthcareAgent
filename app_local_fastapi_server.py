@@ -84,6 +84,10 @@ infer_engine = InferEngine(
 app = FastAPI()
 
 
+REFERENCE_START = "<reference>"
+REFERENCE_END = "</reference>"
+
+
 # 与声明查询参数一样，包含默认值的模型属性是可选的，否则就是必选的。默认值为 None 的模型属性也是可选的。
 class ChatRequest(BaseModel):
     model: str | None = Field(
@@ -137,7 +141,7 @@ class ChatCompletionMessage(BaseModel):
         examples=["你是谁?"],
     )
     # 允许添加额外字段
-    reference: list[str] | None = Field(
+    references: list[str] | None = Field(
         None,
         description="The reference text(s) used for generating the response",
         examples=[["book1", "book2"]],
@@ -346,6 +350,9 @@ def generate(
     documents_str, references = vector_database.similarity_search(
         content,
     )
+    references_str = "\n".join(
+        [f"{REFERENCE_START}{r}{REFERENCE_END}" for r in references]
+    )
 
     # 格式化rag文件
     prompt = (
@@ -404,7 +411,8 @@ def generate(
                         index=0,
                         finish_reason="stop",
                         delta=ChoiceDelta(
-                            reference=references,
+                            content=references_str,
+                            references=references,
                         ),
                     )
                 ],
@@ -442,8 +450,8 @@ def generate(
                 index=0,
                 finish_reason="stop",
                 message=ChatCompletionMessage(
-                    content=response_str,
-                    reference=references,
+                    content=response_str + "\n" + references_str,
+                    references=references,
                     role="assistant",
                 ),
             ),
