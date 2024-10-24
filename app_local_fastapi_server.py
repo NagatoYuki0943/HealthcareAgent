@@ -84,10 +84,6 @@ infer_engine = InferEngine(
 app = FastAPI()
 
 
-REFERENCE_START = "<reference>"
-REFERENCE_END = "</reference>"
-
-
 # 与声明查询参数一样，包含默认值的模型属性是可选的，否则就是必选的。默认值为 None 的模型属性也是可选的。
 class ChatRequest(BaseModel):
     model: str | None = Field(
@@ -95,7 +91,7 @@ class ChatRequest(BaseModel):
         description="The model used for generating the response",
         examples=["gpt4o", "gpt4"],
     )
-    messages: list[dict[str, str]] = Field(
+    messages: list[dict[str, str | list]] = Field(
         None,
         description="List of dictionaries containing the input text and the corresponding user id",
         examples=[[{"role": "user", "content": "你是谁?"}]],
@@ -350,9 +346,6 @@ def generate(
     documents_str, references = vector_database.similarity_search(
         content,
     )
-    references_str = "\n".join(
-        [f"{REFERENCE_START}{r}{REFERENCE_END}" for r in references]
-    )
 
     # 格式化rag文件
     prompt = (
@@ -411,7 +404,6 @@ def generate(
                         index=0,
                         finish_reason="stop",
                         delta=ChoiceDelta(
-                            content=references_str,
                             references=references,
                         ),
                     )
@@ -450,7 +442,7 @@ def generate(
                 index=0,
                 finish_reason="stop",
                 message=ChatCompletionMessage(
-                    content=response_str + "\n" + references_str,
+                    content=response_str,
                     references=references,
                     role="assistant",
                 ),
@@ -471,21 +463,24 @@ def generate(
 # http://127.0.0.1:8000/docs
 @app.post("/v1/chat/completions", response_model=ChatCompletion)
 async def chat(request: ChatRequest) -> StreamingResponse | ChatCompletion:
-    print(request)
+    print("request: ", request)
 
-    if not request.messages or len(request.messages) == 0:
+    messages = request.messages
+    print("messages: ", messages)
+
+    if not messages or len(messages) == 0:
         raise HTTPException(status_code=400, detail="No messages provided")
 
-    role = request.messages[-1].get("role", "")
+    role = messages[-1].get("role", "")
     if role not in ["user", "assistant"]:
         raise HTTPException(status_code=400, detail="Invalid role")
 
-    content = request.messages[-1].get("content", "")
+    content = messages[-1].get("content", "")
     if not content:
         raise HTTPException(status_code=400, detail="content is empty")
 
     return generate(
-        request.messages,
+        messages,
         request.max_tokens,
         request.temperature,
         request.top_p,
