@@ -11,12 +11,20 @@ from infer_engine import InferEngine, ApiConfig
 from infer_utils import random_uuid_int
 from vector_database import VectorDatabase
 
+from ocr_chat import ocr_detection
+
 
 log_file = logger.add("log/runtime_{time}.log", rotation="00:00")
 
 # -------------------------silicon API---------------------------#
 api_key = os.getenv("API_KEY", "")
 logger.info(f"{api_key = }")
+
+# ------------------------腾讯OCR API-----------------------------#
+ocr_secret_id = os.getenv("OCR_SECRET_ID", "")
+ocr_secret_key = os.getenv("OCR_SECRET_KEY", "")
+logger.info(f"{ocr_secret_id = }")
+logger.info(f"{ocr_secret_key = }")
 
 
 DATA_PATH: str = "./data"
@@ -353,8 +361,9 @@ def rag_generate(
     top_k: int = 40,
     stream: bool = False,
 ) -> StreamingResponse | ChatCompletion:
+    logger.info(f"messages: {messages}")
+
     content: str = messages[-1].get("content", "")
-    content_len: int = len(content)
 
     # 数据库检索
     documents_str, references = vector_database.similarity_search(
@@ -371,6 +380,8 @@ def rag_generate(
 
     # 更新最后一条消息
     messages[-1]["content"] = prompt
+
+    content_len: int = len(prompt)
 
     session_id = random_uuid_int()
 
@@ -472,15 +483,171 @@ def rag_generate(
     return response
 
 
+def ocr_generate(
+    messages: Sequence[dict],
+    max_new_tokens: int = 1024,
+    temperature: float = 0.8,
+    top_p: float = 0.8,
+    top_k: int = 40,
+    stream: bool = False,
+) -> StreamingResponse | ChatCompletion:
+    logger.info(f"messages: {messages}")
+
+    # 最后一条消息
+    # [{"role": "user", "content": "你是谁?"}]
+    # [
+    #     {
+    #         "role": "user",
+    #         "content": [
+    #             {"type": "text", "text": "图片中有什么内容?"},
+    #             {
+    #                 "type": "image_url",
+    #                 "image_url": {"url": "https://example.com/image.jpg"},
+    #             },
+    #         ],
+    #     }
+    # ]
+    # 去除除了最后一次问题中其他对话的图片
+    for message in messages[:-1]:
+        if isinstance(message["content"], list):
+            for item in message["content"]:
+                if item.get("type", "") == "text":
+                    message["content"] = item.get("text", "")
+                    break
+
+    last_message = messages[-1]
+    if isinstance(last_message["content"], list):
+        texts = []
+        ocr_results = []
+        for item in last_message["content"]:
+            if item.get("type", "") == "text":
+                texts.append(item.get("text", ""))
+            else:
+                # 图片ocr
+                img_url = item.get("image_url", {}).get("url", "")
+                logger.info("use ocr_detection")
+                _ocr_result: str = ocr_detection(img_url, ocr_secret_id, ocr_secret_key) or ""
+                ocr_results.append(_ocr_result)
+        text = "".join(texts)
+        if ocr_results:
+            ocr_result = "".join([f"<ocr>\n{_ocr_result}\n</ocr>" for _ocr_result in ocr_results])
+            _content = f"图片ocr检测结果:\n{ocr_result}\n question: {text}"
+        else:
+            _content = text
+        messages[-1]["content"] = _content
+        logger.inf("messages after ocr: ", messages)
+
+    content_len: int = len(messages[-1].get("content", ""))
+
+    session_id = random_uuid_int()
+
+    if stream:
+
+        async def generate():
+            response_len = 0
+            for response_str in infer_engine.chat_stream(
+                messages,
+                None,
+                max_new_tokens,
+                temperature,
+                top_p,
+                top_k,
+                session_id,
+            ):
+                response_len += len(response_str)
+                response = ChatCompletionChunk(
+                    id=session_id,
+                    choices=[
+                        ChatCompletionChunkChoice(
+                            index=0,
+                            finish_reason=None,
+                            delta=ChoiceDelta(
+                                content=response_str,
+                                role="assistant",
+                            ),
+                        )
+                    ],
+                    created=time.time(),
+                    usage=CompletionUsage(
+                        prompt_tokens=content_len,
+                        completion_tokens=response_len,
+                        total_tokens=content_len + response_len,
+                    ),
+                )
+                print(response)
+                # openai api returns \n\n as a delimiter for messages
+                yield f"data: {response.model_dump_json()}\n\n"
+
+            response = ChatCompletionChunk(
+                id=session_id,
+                choices=[
+                    ChatCompletionChunkChoice(
+                        index=0,
+                        finish_reason="stop",
+                        delta=ChoiceDelta(),
+                    )
+                ],
+                created=time.time(),
+                usage=CompletionUsage(
+                    prompt_tokens=content_len,
+                    completion_tokens=response_len,
+                    total_tokens=content_len + response_len,
+                ),
+            )
+            print(response)
+            # openai api returns \n\n as a delimiter for messages
+            yield f"data: {response.model_dump_json()}\n\n"
+
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(generate())
+
+    # 生成回复
+    response_str = infer_engine.chat(
+        messages,
+        None,
+        max_new_tokens,
+        temperature,
+        top_p,
+        top_k,
+        session_id,
+    )
+
+    # 非流式响应
+    response = ChatCompletion(
+        id=session_id,
+        choices=[
+            ChatCompletionChoice(
+                index=0,
+                finish_reason="stop",
+                message=ChatCompletionMessage(
+                    content=response_str,
+                    role="assistant",
+                ),
+            ),
+        ],
+        created=time.time(),
+        usage=CompletionUsage(
+            prompt_tokens=content_len,
+            completion_tokens=len(response_str),
+            total_tokens=content_len + len(response_str),
+        ),
+    )
+    return response
+
+
 # 将请求体作为 JSON 读取
 # 在函数内部，你可以直接访问模型对象的所有属性
 # http://127.0.0.1:8000/docs
 @app.post("/v1/chat/completions", response_model=ChatCompletion)
 async def chat(request: ChatRequest) -> StreamingResponse | ChatCompletion:
-    print("request: ", request)
+    logger.info(f"request: {request}")
+
+    model = request.model
+    logger.info(f"model: {model}")
 
     messages = request.messages
-    print("messages: ", messages)
+    logger.info(f"messages: {messages}")
 
     if not messages or len(messages) == 0:
         raise HTTPException(status_code=400, detail="No messages provided")
@@ -493,14 +660,24 @@ async def chat(request: ChatRequest) -> StreamingResponse | ChatCompletion:
     if not content:
         raise HTTPException(status_code=400, detail="content is empty")
 
-    return rag_generate(
-        messages,
-        request.max_tokens,
-        request.temperature,
-        request.top_p,
-        request.top_k,
-        request.stream,
-    )
+    if model == "ocr_chat":
+        return ocr_generate(
+            messages,
+            request.max_tokens,
+            request.temperature,
+            request.top_p,
+            request.top_k,
+            request.stream,
+        )
+    else:
+        return rag_generate(
+            messages,
+            request.max_tokens,
+            request.temperature,
+            request.top_p,
+            request.top_k,
+            request.stream,
+        )
 
 
 # uvicorn app_local_fastapi_server:app --reload --port=8000

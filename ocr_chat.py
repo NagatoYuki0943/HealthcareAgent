@@ -18,7 +18,7 @@ from tencentcloud.ocr.v20181119 import ocr_client, models
 # https://blog.csdn.net/weixin_30347335/article/details/95849160
 
 
-def get_file_content_as_base64(path, urlencoded=False):
+def get_file_content_as_base64(path: str, urlencoded=False):
     """
     获取文件base64编码
     :param path: 文件路径
@@ -33,7 +33,7 @@ def get_file_content_as_base64(path, urlencoded=False):
     return content
 
 
-def ocr_detection(img, secret_id, secret_key):
+def ocr_detection(image_path: str, secret_id: str, secret_key: str):
     try:
         cred = credential.Credential(secret_id, secret_key)
         # 实例化一个http选项，可选的，没有特殊需求可以跳过
@@ -52,7 +52,14 @@ def ocr_detection(img, secret_id, secret_key):
         #     "ImageUrl": "ImageUrl"
         # }
         # req.from_json_string(json.dumps(params))
-        req.ImageBase64 = get_file_content_as_base64(img)
+        if os.path.exists(image_path):
+            req.ImageBase64 = get_file_content_as_base64(image_path)
+        elif image_path.startswith("http"):
+            req.ImageUrl = image_path
+        elif image_path.startswith("data:image/"):
+            req.ImageBase64 = image_path.split(",")[1]
+        else:
+            raise Exception("Invalid image source")
 
         # 返回的resp是一个RecognizeTableAccurateOCRResponse的实例，与请求对象对应
         resp = client.RecognizeTableAccurateOCR(req)
@@ -80,7 +87,7 @@ def ocr_detection(img, secret_id, secret_key):
         print(err)
 
 
-def get_ernie_access_token(ernie_api_key, ernie_secret_key):
+def get_ernie_access_token(ernie_api_key: str, ernie_secret_key: str):
     """
     使用 AK，SK 生成鉴权签名（Access Token）
     :return: access_token，或是None(如果错误)
