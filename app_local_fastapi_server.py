@@ -345,7 +345,7 @@ class ChatCompletionChunk(BaseModel):
         return self.model_dump_json()
 
 
-def generate(
+def rag_generate(
     messages: Sequence[dict],
     max_new_tokens: int = 1024,
     temperature: float = 0.8,
@@ -493,7 +493,7 @@ async def chat(request: ChatRequest) -> StreamingResponse | ChatCompletion:
     if not content:
         raise HTTPException(status_code=400, detail="content is empty")
 
-    return generate(
+    return rag_generate(
         messages,
         request.max_tokens,
         request.temperature,
