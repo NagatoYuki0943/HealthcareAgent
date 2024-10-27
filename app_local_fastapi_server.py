@@ -94,7 +94,21 @@ class ChatRequest(BaseModel):
     messages: list[dict[str, str | list]] = Field(
         None,
         description="List of dictionaries containing the input text and the corresponding user id",
-        examples=[[{"role": "user", "content": "你是谁?"}]],
+        examples=[
+            [{"role": "user", "content": "你是谁?"}],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "图片中有什么内容?"},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "https://example.com/image.jpg"},
+                        },
+                    ],
+                }
+            ],
+        ],
     )
     max_tokens: int = Field(
         1024, ge=1, le=2048, description="Maximum number of new tokens to generate"
