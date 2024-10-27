@@ -22,6 +22,8 @@ def requests_chat(data: dict):
     response: requests.Response = requests.post(
         URL, json=data, headers=headers, timeout=60, stream=stream
     )
+    response.raise_for_status()
+
     if not stream:
         yield response.json()
     else:
