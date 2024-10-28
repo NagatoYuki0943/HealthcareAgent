@@ -522,12 +522,14 @@ def ocr_generate(
         for item in last_message["content"]:
             if item.get("type", "") == "text":
                 texts.append(item.get("text", ""))
-            else:
+            elif item.get("type", "") == "image_url":
                 # 图片ocr
                 img_url = item.get("image_url", {}).get("url", "")
                 logger.info("use ocr_detection")
                 _ocr_result: str = ocr_detection(img_url, ocr_secret_id, ocr_secret_key) or ""
                 ocr_results.append(_ocr_result)
+            else:
+                logger.warning(f"unknown content type: {item.get('type', '')}")
         text = "".join(texts)
         if ocr_results:
             ocr_result = "".join([f"<ocr>\n{_ocr_result}\n</ocr>" for _ocr_result in ocr_results])
