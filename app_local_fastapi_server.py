@@ -537,7 +537,7 @@ def ocr_generate(
         else:
             _content = text
         messages[-1]["content"] = _content
-        logger.inf("messages after ocr: ", messages)
+        logger.info("messages after ocr: ", messages)
 
     content_len: int = len(messages[-1].get("content", ""))
 
