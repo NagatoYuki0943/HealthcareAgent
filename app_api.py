@@ -304,45 +304,6 @@ def main() -> None:
                 gr.Markdown("""<h1><center>Healthcare Agent</center></h1>""")
             # gr.Image(value=LOGO_PATH, scale=1, min_width=10,show_label=False, show_download_button=False)
 
-        # 化验报告分析页面
-        with gr.Tab("化验报告分析"):
-            # 用来存放ocr图片路径，防止重复使用ocr
-            current_img = gr.State("")
-
-            gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>""")
-            with gr.Row():
-                img_chatbot = gr.Chatbot(height=450, show_copy_button=True)
-                img_show = gr.Image(
-                    sources=["upload", "webcam", "clipboard"],
-                    type="filepath",
-                    label="输入的化验报告图片",
-                    height=450,
-                )
-
-            with gr.Row():
-                question = gr.Textbox(label="Prompt/问题", scale=2)
-                # img_intput = gr.UploadButton('📁', elem_id='upload', file_types=['image'], scale=0)
-                # print(img_intput.name)
-                subbt = gr.Button(value="Chat", variant="primary", scale=0)
-                # 创建一个清除按钮，用于清除聊天机器人组件的内容。
-                clear = gr.ClearButton(
-                    components=[img_chatbot, img_show, current_img],
-                    value="Clear",
-                    variant="stop",
-                    scale=0,
-                )
-
-        subbt.click(
-            ocr_chat,
-            inputs=[img_show, question, img_chatbot, current_img],
-            outputs=[question, img_chatbot, current_img],
-        )
-        question.submit(
-            ocr_chat,
-            inputs=[img_show, question, img_chatbot, current_img],
-            outputs=[question, img_chatbot, current_img],
-        )
-
         # 智能问答页面
         with gr.Tab("医疗智能问答"):
             with gr.Row():
@@ -477,6 +438,45 @@ def main() -> None:
 
                 # 撤销
                 undo.click(revocery, inputs=[chatbot], outputs=[query, chatbot])
+
+        # 化验报告分析页面
+        with gr.Tab("化验报告分析"):
+            # 用来存放ocr图片路径，防止重复使用ocr
+            current_img = gr.State("")
+
+            gr.Markdown("""<h1><center>报告分析 Healthcare Textract</center></h1>""")
+            with gr.Row():
+                img_chatbot = gr.Chatbot(height=450, show_copy_button=True)
+                img_show = gr.Image(
+                    sources=["upload", "webcam", "clipboard"],
+                    type="filepath",
+                    label="输入的化验报告图片",
+                    height=450,
+                )
+
+            with gr.Row():
+                question = gr.Textbox(label="Prompt/问题", scale=2)
+                # img_intput = gr.UploadButton('📁', elem_id='upload', file_types=['image'], scale=0)
+                # print(img_intput.name)
+                subbt = gr.Button(value="Chat", variant="primary", scale=0)
+                # 创建一个清除按钮，用于清除聊天机器人组件的内容。
+                clear = gr.ClearButton(
+                    components=[img_chatbot, img_show, current_img],
+                    value="Clear",
+                    variant="stop",
+                    scale=0,
+                )
+
+        subbt.click(
+            ocr_chat,
+            inputs=[img_show, question, img_chatbot, current_img],
+            outputs=[question, img_chatbot, current_img],
+        )
+        question.submit(
+            ocr_chat,
+            inputs=[img_show, question, img_chatbot, current_img],
+            outputs=[question, img_chatbot, current_img],
+        )
 
         gr.Markdown("""
         ### 内容由 AI 大模型生成，不构成专业医疗意见或诊断。
