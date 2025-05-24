@@ -8,20 +8,17 @@ import os
 import gradio as gr
 from typing import Generator, Sequence, Any
 import threading
-import json
-import requests
 from loguru import logger
 from modelscope import snapshot_download
 
 from vector_database import VectorDatabase
 from infer_engine import InferEngine, ApiConfig
-from infer_utils import convert_gradio_to_openai_format
 from utils import (
     remove_history_references,
     download_openxlab_dataset,
     format_references,
 )
-from ocr_chat import get_ernie_access_token, ocr_detection
+from ocr_chat import ocr_detection
 
 
 log_file = logger.add("log/runtime_{time}.log", rotation="00:00")
@@ -50,12 +47,6 @@ ocr_secret_key = os.getenv("OCR_SECRET_KEY", "")
 logger.info(f"{ocr_secret_id = }")
 logger.info(f"{ocr_secret_key = }")
 
-# -------------------------文心一言 API---------------------------#
-ernie_api_key = os.getenv("ERNIE_API_KEY", "")
-ernie_secret_key = os.getenv("ERNIE_SECRET_KEY", "")
-logger.info(f"{ernie_api_key = }")
-logger.info(f"{ernie_secret_key = }")
-
 # -------------------------silicon API---------------------------#
 api_key = os.getenv("API_KEY", "")
 logger.info(f"{api_key = }")
@@ -82,13 +73,13 @@ snapshot_download(
     local_dir=RERANKER_MODEL_PATH,
 )
 
-# 下载数据集,不会重复下载
-download_openxlab_dataset(
-    dataset_repo="NagatoYuki0943/FMdocs",
-    target_path=DATA_PATH,
-    access_key=openxlab_access_key,
-    secret_key=openxlab_secret_key,
-)
+# # 下载数据集,不会重复下载
+# download_openxlab_dataset(
+#     dataset_repo="NagatoYuki0943/FMdocs",
+#     target_path=DATA_PATH,
+#     access_key=openxlab_access_key,
+#     secret_key=openxlab_secret_key,
+# )
 
 # 向量数据库
 vector_database = VectorDatabase(
@@ -131,7 +122,7 @@ TEMPLATE = """上下文:
 API_CONFIG = ApiConfig(
     base_url="https://api.siliconflow.cn/v1",
     api_key=api_key,
-    model="internlm/internlm2_5-7b-chat",
+    model="Qwen/Qwen3-8B",
     system_prompt=SYSTEM_PROMPT,
 )
 

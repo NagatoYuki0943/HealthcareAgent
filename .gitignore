@@ -7,3 +7,5 @@ work_dirs/
 data/
 vector_db/
 log/
+
+.gradio/
